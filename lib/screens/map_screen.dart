@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'profile_screen.dart';
 
-class Spot {
+class Spot {  
   final String title;
   final String description;
   final LatLng location;
@@ -310,27 +311,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
-// 6. NEW PROFILE SCREEN FILE
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white, // Covers the whole screen
-      appBar: AppBar(
-        title: const Text("My Profile"),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context), // The "Back" button
-        ),
-      ),
-      body: const Center(child: Text("Profile Settings Go Here")),
-    );
-  }
-}
 
 /// CREATE MOMENT
 void _createMoment() {
