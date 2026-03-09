@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'achievements_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  final int worldPrecentage = 24;
+  final int spotsCount = 42;
+  final int contributionsCount = 2700;
+  final String username = "@travel_user";
+
 
   // Basic structure of the profile screen with header, stats, collections, and photo grid
   @override
@@ -22,9 +29,9 @@ class ProfileScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(context),
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(left: 20, bottom: 10),
-              child: Text("@travel_user", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              child: Text(username, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             ),
             _buildCollectionsRow(),
             const SizedBox(height: 20),
@@ -51,8 +58,19 @@ class ProfileScreen extends StatelessWidget {
               child: Text("t", style: TextStyle(fontSize: 40, color: Colors.white, fontWeight: FontWeight.w300)),
             ),
           ),
-          _buildStatColumn("42", "spots"),
-          _buildStatColumn("2.7K", "contributions"),
+          GestureDetector(
+            onTap: () => _openAchievementsScreen(), // New function for achievements
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[200], // Subtle background for the "button"
+                shape: BoxShape.circle,
+              ),
+            child: const Icon(Icons.import_contacts_sharp, size: 22, color: Colors.black87),
+            ),
+          ),
+          _buildStatColumn("$spotsCount", "spots"),
+          _buildStatColumn("$contributionsCount", "contributions"),
           _buildProgressCircle(),
         ],
       ),
@@ -87,7 +105,6 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                     // The Edit Pencil Button
-                    // Corrected: Just Positioned, no "Position:" prefix
                   Positioned(
                     bottom: 5,
                     right: 5,
@@ -99,7 +116,7 @@ class ProfileScreen extends StatelessWidget {
                       child: const CircleAvatar(
                         backgroundColor: Colors.white,
                         radius: 20,
-                        child: Icon(Icons.edit, color: Colors.blue, size: 20),
+                        child: Icon(Icons.edit, color: Color(0xFF91A1E8)),
                       ),
                     ),
                   ),
@@ -165,16 +182,16 @@ class ProfileScreen extends StatelessWidget {
           height: 60,
           width: 60,
           child: CircularProgressIndicator(
-            value: 0.24,
+            value: worldPrecentage / 100,
             strokeWidth: 6,
             backgroundColor: Colors.grey[300],
             valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3B444B)),
           ),
         ),
-        const Column(
+        Column(
           children: [
-            Text("24%", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            Text("World", style: TextStyle(fontSize: 8, color: Colors.green)),
+            Text("$worldPrecentage%", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            Text("World", style: TextStyle(fontSize: 10, color: Color(0xFF91A1E8))),
           ],
         )
       ],
@@ -225,19 +242,13 @@ class ProfileScreen extends StatelessWidget {
 
   // 3. Middle Tab Bar
   Widget _buildTabSelector() {
-    return Container(
-      color: Colors.grey[200],
-      height: 50,
-      child: const Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          Icon(Icons.blur_on),
-          Icon(Icons.contact_mail_outlined),
-          Icon(Icons.speed),
-        ],
-      ),
-    );
-  }
+  return Container(
+    color: Color(0xFF91A1E8), // Darker grey background
+    height: 45, // Slightly slimmer like the image
+    width: double.infinity,
+    // Row is removed to keep it empty
+  );
+}
 
   // 4. Bottom Grid
   Widget _buildPhotoGrid() {
@@ -252,9 +263,17 @@ class ProfileScreen extends StatelessWidget {
       itemCount: 12,
       itemBuilder: (context, index) {
         return Container(
-          decoration: BoxDecoration(border: Border.all(color: Colors.grey.withOpacity(0.2))),
+          decoration: BoxDecoration(border: Border.all(color: Color.fromARGB(255, 196, 201, 219))),
         );
       },
+    );
+  }
+
+  // Open the achievements screen
+  void _openAchievementsScreen(context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AchievementsScreen()),
     );
   }
 }
