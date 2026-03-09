@@ -59,7 +59,7 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           GestureDetector(
-            onTap: () => _openAchievementsScreen(), // New function for achievements
+            onTap: () => _openAchievementsScreen(context), // New function for achievements
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
