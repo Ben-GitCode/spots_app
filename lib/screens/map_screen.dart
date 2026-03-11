@@ -2,15 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'profile_screen.dart';
-
-class Spot {  
-  final String title;
-  final String description;
-  final LatLng location;
-  final Color color;
-
-  Spot(this.title, this.description, this.location, this.color);
-}
 import 'package:spots_app/utils/models.dart';
 import 'spot_details_screen.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -592,44 +583,5 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     });
 
     controller.forward();
-  }
-}
-
-
-
-/// CREATE MOMENT
-void _createMoment() {
-  print("Create moment");
-}
-
-void _openSaved() {
-  print("Open saved");
-}
-
-void _openProfile() {
-  print("Profile");
-}
-
-void _openSteps() {
-  print("Steps / notifications");
-// PROFILE SCREEN
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text("My Profile"),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: const Center(child: Text("Profile Settings Go Here")),
-    );
   }
 }
