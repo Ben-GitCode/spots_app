@@ -2,12 +2,20 @@ import 'package:flutter/material.dart';
 import 'achievements_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  final int worldPercentage;
+  final int spotsCount;
+  final int contributionsCount;
+  final String username;
+  final List<String> userPhotos;
 
-  final int worldPrecentage = 24;
-  final int spotsCount = 42;
-  final int contributionsCount = 2700;
-  final String username = "@travel_user";
+  const ProfileScreen({
+    super.key,
+    required this.worldPercentage,
+    required this.spotsCount,
+    required this.contributionsCount,
+    required this.username,
+    required this.userPhotos,
+  });
 
 
   // Basic structure of the profile screen with header, stats, collections, and photo grid
@@ -36,7 +44,7 @@ class ProfileScreen extends StatelessWidget {
             _buildCollectionsRow(),
             const SizedBox(height: 20),
             _buildTabSelector(),
-            _buildPhotoGrid(),
+            _buildPhotoGrid(userPhotos),
           ],
         ),
       ),
@@ -59,7 +67,7 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           GestureDetector(
-            onTap: () => _openAchievementsScreen(), // New function for achievements
+            onTap: () => _openAchievementsScreen(context), // New function for achievements
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -165,14 +173,28 @@ class ProfileScreen extends StatelessWidget {
 
   // A collumn for the stats in the header
   Widget _buildStatColumn(String count, String label) {
+    int value = int.parse(count);
     return Column(
       children: [
-        Text(count, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        if (value >= 1000000)
+          Text(
+            "${(((value / 1000000) * 10).floor()/10).toStringAsFixed(1)}M",
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          )
+        else if (value >= 1000)
+          Text(
+            "${(((value / 1000) * 10).floor()/10).toStringAsFixed(1)}K",
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          )
+        else
+          Text(
+            count,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
         Text(label, style: const TextStyle(color: Colors.grey)),
       ],
     );
-  }
-
+  } 
   // The world progress circle
   Widget _buildProgressCircle() {
     return Stack(
@@ -182,7 +204,7 @@ class ProfileScreen extends StatelessWidget {
           height: 60,
           width: 60,
           child: CircularProgressIndicator(
-            value: worldPrecentage / 100,
+            value: worldPercentage / 100,
             strokeWidth: 6,
             backgroundColor: Colors.grey[300],
             valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3B444B)),
@@ -190,7 +212,7 @@ class ProfileScreen extends StatelessWidget {
         ),
         Column(
           children: [
-            Text("$worldPrecentage%", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            Text("$worldPercentage%", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
             Text("World", style: TextStyle(fontSize: 10, color: Color(0xFF91A1E8))),
           ],
         )
@@ -215,6 +237,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  // Building each collection card with an optional icon or image
   Widget _collectionCard(String title, IconData? icon, String? imageUrl) {
     return Container(
       width: 90,
@@ -251,24 +274,32 @@ class ProfileScreen extends StatelessWidget {
 }
 
   // 4. Bottom Grid
-  Widget _buildPhotoGrid() {
+  Widget _buildPhotoGrid(List<String> photos) {
     return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true, // important
+      physics: const NeverScrollableScrollPhysics(), // important
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         crossAxisSpacing: 2,
         mainAxisSpacing: 2,
       ),
-      itemCount: 12,
+      itemCount: photos.length,
       itemBuilder: (context, index) {
         return Container(
-          decoration: BoxDecoration(border: Border.all(color: Color.fromARGB(255, 196, 201, 219))),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: const Color.fromARGB(255, 196, 201, 219),
+            ),
+          ),
+          child: Image.network(
+            photos[index],
+            fit: BoxFit.cover,
+          ),
         );
       },
     );
   }
-
+  
   // Open the achievements screen
   void _openAchievementsScreen(context) {
     Navigator.push(
