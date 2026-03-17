@@ -46,11 +46,11 @@ Widget build(BuildContext context) {
                   const SizedBox(width: 105), 
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 15, bottom: 10),
+                      padding: const EdgeInsets.only(top: 5, bottom: 10),
                       child: Text(
                         username,
                         style: const TextStyle(
-                          fontSize: 22,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF335C81),
                         ),
@@ -61,26 +61,37 @@ Widget build(BuildContext context) {
               ),
             ),
 
-            // 2. SPOTS & CONTRIBUTIONS
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildStatColumn("Spots", spotsCount),
-                Container(width: 1, height: 30, color: Colors.grey[300]),
-                _buildStatColumn("Contributions", contributionsCount),
-              ],
-            ),
+            const SizedBox(height: 15), //was 20
 
-            const SizedBox(height: 20),
+            // 2. SPOTS & CONTRIBUTIONS & PASSPORT
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0), // Adds space to left AND right edges
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  // --- Your Stats ---
+                  _buildStatColumn("Spots", spotsCount),
+                  const SizedBox(width: 20),
+                  Container(width: 1, height: 30, color: Colors.grey[300]),
+                  const SizedBox(width: 20),
+                  _buildStatColumn("Contributions", contributionsCount),
 
-            // 3. COLLECTIONS
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                "Collections",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  const SizedBox(width: 20),
+
+                  // --- The Passport Icon ---
+                  IconButton(
+                    icon: const Icon(Icons.badge, size: 28), // "Passport" look-alike icon
+                    onPressed: () => _openAchievementsScreen(context),
+                    tooltip: 'Open Achievements',
+                    color: Colors.black87, // Change to your brand color
+                  ),
+                ],
               ),
             ),
+
+            const SizedBox(height: 20), //was 20
+
+            // 3. COLLECTIONS
             const SizedBox(height: 10),
             SizedBox(
               height: 100,
@@ -104,12 +115,15 @@ Widget build(BuildContext context) {
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(
                 children: [
+                  const SizedBox(width: 100),
                   TextButton.icon(
                     onPressed: () {},
                     icon: const Icon(Icons.sort, size: 20, color: Colors.black87),
                     label: const Text("Sort", style: TextStyle(color: Colors.black87)),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 20),
+                  Container(width: 1, height: 30, color: Colors.grey[300]),
+                  const SizedBox(width: 20),
                   TextButton.icon(
                     onPressed: () {},
                     icon: const Icon(Icons.filter_list, size: 20, color: Colors.black87),
@@ -118,8 +132,6 @@ Widget build(BuildContext context) {
                 ],
               ),
             ),
-
-            const Divider(height: 10, thickness: 1),
 
             // 5. PHOTO GRID
             Expanded(
@@ -158,23 +170,26 @@ Widget build(BuildContext context) {
       Positioned(
         top: 0, 
         left: 20,
-        child: Container(
-          width: 90,
-          height: 90,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 4),
-            image: DecorationImage(
-              image: NetworkImage(userPhotos[0]),
-              fit: BoxFit.cover,
+        child: GestureDetector(
+          onTap: () => _showProfileOptions(context), // Call the pop-up function
+          child: Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 4),
+              image: DecorationImage(
+                image: NetworkImage(userPhotos[0]),
+                fit: BoxFit.cover,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 12,
+                  color: Colors.black.withOpacity(0.15),
+                  offset: const Offset(0, 4),
+                )
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 12,
-                color: Colors.black.withOpacity(0.15),
-                offset: const Offset(0, 4),
-              )
-            ],
           ),
         ),
       ),
@@ -325,7 +340,7 @@ Widget build(BuildContext context) {
       ],
     );
   } 
-  
+  // The world progress circle
   Widget _buildCircularPercentage(double percent) {
     return Container(
       width: 70,
@@ -347,31 +362,7 @@ Widget build(BuildContext context) {
       ),
     );
   }
-}
-  // The world progress circle
-  // Widget _buildProgressCircle() {
-  //   return Stack(
-  //     alignment: Alignment.center,
-  //     children: [
-  //       SizedBox(
-  //         height: 60,
-  //         width: 60,
-  //         child: CircularProgressIndicator(
-  //           value: worldPercentage / 100,
-  //           strokeWidth: 6,
-  //           backgroundColor: Colors.grey[300],
-  //           valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3B444B)),
-  //         ),
-  //       ),
-  //       Column(
-  //         children: [
-  //           Text("$worldPercentage%", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-  //           Text("World", style: TextStyle(fontSize: 10, color: Color(0xFF91A1E8))),
-  //         ],
-  //       )
-  //     ],
-  //   );
-  // }
+
   Widget _buildCollectionCard(String title, String imageUrl) {
     return Container(
       width: 80,
@@ -400,23 +391,7 @@ Widget build(BuildContext context) {
     );
   }
 
-  // Horizontal Collections Row
-  Widget _buildCollectionsRow() {
-    return SizedBox(
-      height: 110,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 15),
-        children: [
-          _collectionCard("New\nCollection", Icons.add, null),
-          _collectionCard("Japan trip\n2025", null, "https://picsum.photos/100/100?random=1"),
-          _collectionCard("Family\nevents", null, "https://picsum.photos/100/100?random=2"),
-          _collectionCard("Sunsets Around\nthe world", null, "https://picsum.photos/100/100?random=3"),
-        ],
-      ),
-    );
-  }
-
+  
   // Building each collection card with an optional icon or image
   Widget _collectionCard(String title, IconData? icon, String? imageUrl) {
     return Container(
@@ -443,15 +418,6 @@ Widget build(BuildContext context) {
     );
   }
 
-  // 3. Middle Tab Bar
-  Widget _buildTabSelector() {
-  return Container(
-    color: Color(0xFF91A1E8), // Darker grey background
-    height: 45, // Slightly slimmer like the image
-    width: double.infinity,
-    // Row is removed to keep it empty
-  );
-}
 
   // 4. Bottom Grid
   Widget _buildPhotoGrid(List<String> photos) {
@@ -487,3 +453,4 @@ Widget build(BuildContext context) {
       MaterialPageRoute(builder: (context) => const AchievementsScreen()),
     );
   }
+}
