@@ -535,77 +535,29 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       builder: (context) {
         return DraggableScrollableSheet(
           initialChildSize: 0.75, // 0.85
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
+          minChildSize: 0.75,
+          maxChildSize: 0.75,
           expand: false,
           builder: (context, scrollController) {
-            return ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(25),
-              ),
-              child: ProfileScreen(
-                worldPercentage: 24,
-                spotsCount: 3567788,
-                contributionsCount: 12365,
-                username: "@travel_user",
-                scrollController: scrollController,
-                userPhotos: [
-                  "https://th.bing.com/th/id/OIP.WX9eEoyCf79l0nvM9TdlkgAAAA?w=143&h=180&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                  "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-            
-                ],
-              ),
-            );
-          },
-        );
-      },
-    ).whenComplete(() {
-    _profileOpen = false;
-  });
-}
+            return ProfileScreen(
+              worldPercentage: 33,
+              spotsCount: 3567788,
+              contributionsCount: 12365,
+              username: "@travel_user",
+              scrollController: scrollController,
+              userPhotos: [
+                "https://th.bing.com/th/id/OIP.Ufv8ve9S5hVyGsMqbNwqEAHaE8?w=301&h=180&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
+                "https://th.bing.com/th/id/OIP.evi8jxbBP9Xd_hPbwyEoVAHaE8?w=245&h=180&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
+                
+                ]
+              );
+            },
+          );
+        },
+      ).whenComplete(() {
+        _profileOpen = false;
+      });
+    }
 
 
   // Moved these INSIDE the class where they belong!

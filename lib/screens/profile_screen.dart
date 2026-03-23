@@ -22,164 +22,141 @@ class ProfileScreen extends StatelessWidget {
 
   // Basic structure of the profile screen with header, stats, collections, and photo grid
   @override
-Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
   return Stack(
     clipBehavior: Clip.none,
     children: [
-      // --- THE ACTUAL WHITE BOX ---
+      // --- THE WHITE SHEET (Locked in place) ---
       Container(
-        // Margin provides the "sky" for floating elements to sit in
-        margin: const EdgeInsets.only(top: 45), 
+        margin: const EdgeInsets.only(top: 45),
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: const Color(0xFFFBFBF2),
           borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. HEADER AREA (Space for Name next to the floating photo)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  // This empty space stays where the photo is floating
-                  const SizedBox(width: 105), 
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 5, bottom: 10),
-                      child: Text(
-                        username,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF335C81),
+        child: ClipRRect( // Prevents photos from scrolling "outside" the rounded corners
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+          child: Column(
+            children: [
+              // Use Expanded so the CustomScrollView knows its boundaries
+              Expanded(
+                child: CustomScrollView(
+                  controller: scrollController,
+                  slivers: [
+                    // 1. Everything that SHOULD scroll away
+                    SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildNameHeader(),
+                          const SizedBox(height: 15),
+                          _buildStatsAndPassport(context),
+                          const SizedBox(height: 20),
+                          _buildCollectionsSection(),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+
+                    // 2. The Sticky Sort & Filter Bar
+                    SliverPersistentHeader(
+                      pinned: true, // This locks it to the top of the sheet
+                      delegate: _StickyHeaderDelegate(
+                        child: Container(
+                          color: const Color(0xFFFBFBF2), // Opaque so grid hides behind it
+                          child: Column(
+                            children: [
+                              _buildSortFilterRow(),
+                              const Divider(height: 1, thickness: 1, indent: 20, endIndent: 20),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
 
-            const SizedBox(height: 15), //was 20
-
-            // 2. SPOTS & CONTRIBUTIONS & PASSPORT
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0), // Adds space to left AND right edges
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  // --- Your Stats ---
-                  _buildStatColumn("Spots", spotsCount),
-                  const SizedBox(width: 20),
-                  Container(width: 1, height: 30, color: Colors.grey[300]),
-                  const SizedBox(width: 20),
-                  _buildStatColumn("Contributions", contributionsCount),
-
-                  const SizedBox(width: 20),
-
-                  // --- The Passport Icon ---
-                  IconButton(
-                    icon: const Icon(Icons.badge, size: 28), // "Passport" look-alike icon
-                    onPressed: () => _openAchievementsScreen(context),
-                    tooltip: 'Open Achievements',
-                    color: Colors.black87, // Change to your brand color
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20), //was 20
-
-            // 3. COLLECTIONS
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 100,
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                scrollDirection: Axis.horizontal,
-                itemCount: 5,
-                itemBuilder: (context, index) {
-                  return _buildCollectionCard(
-                    "Trip ${index + 1}", 
-                    userPhotos[index % userPhotos.length]
-                  );
-                },
-              ),
-            ),
-
-            const Divider(height: 30, thickness: 1, indent: 20, endIndent: 20),
-
-            // 4. SORT & FILTER
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(
-                children: [
-                  const SizedBox(width: 100),
-                  TextButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.sort, size: 20, color: Colors.black87),
-                    label: const Text("Sort", style: TextStyle(color: Colors.black87)),
-                  ),
-                  const SizedBox(width: 20),
-                  Container(width: 1, height: 30, color: Colors.grey[300]),
-                  const SizedBox(width: 20),
-                  TextButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.filter_list, size: 20, color: Colors.black87),
-                    label: const Text("Filter", style: TextStyle(color: Colors.black87)),
-                  ),
-                ],
-              ),
-            ),
-
-            // 5. PHOTO GRID
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(10),
-                // Ensure the grid scrolls within the sheet
-                controller: scrollController, 
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
+                    // 3. The Photo Grid
+                    SliverPadding(
+                      padding: const EdgeInsets.all(10),
+                      sliver: SliverGrid(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 0.75, // Adjusted to make the cards taller
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(color: Colors.black87, width: 2),
+                                borderRadius: BorderRadius.circular(4), // Subtle rounding
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 6,
+                                    offset: const Offset(2, 4),
+                                  ),
+                                ],
+                              ),
+                              padding: const EdgeInsets.all(6), // The white border
+                              child: Column(
+                                children: [
+                                  // The actual photo
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(2),
+                                      child: Image.network(
+                                        userPhotos[index],
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                      ),
+                                    ),
+                                  ),
+                                  // The "Chin" (the extra space at the bottom)
+                                  const SizedBox(height: 12), 
+                                  // Optional: Add a tiny bit of text or just empty space
+                                  Container(
+                                    height: 10, 
+                                    width: 40,
+                                    color: Colors.grey.withOpacity(0.05), // Mimics a faint caption area
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          childCount: userPhotos.length,
+                        ),
+                      ),
+                    )
+                  ],
                 ),
-                itemCount: userPhotos.length,
-                itemBuilder: (context, index) {
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(userPhotos[index], fit: BoxFit.cover),
-                  );
-                },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
 
-      // --- FLOATING ELEMENTS (Placed last to be on top) ---
-
-      // WORLD PERCENTAGE (Top Right)
+      // Floating World Percentage Circle
       Positioned(
-        top: 10, 
+        top: -35, // Moves it 35 pixels ABOVE the top of the white box
         right: 25,
         child: _buildCircularPercentage(worldPercentage.toDouble()),
       ),
 
-      // PROFILE PHOTO (Top Left, Half-out)
+      // Floating Profile Photo
       Positioned(
-        top: 0, 
+        top: 0,
         left: 20,
         child: GestureDetector(
-          onTap: () => _showProfileOptions(context), // Call the pop-up function
+          onTap: () => _showProfileOptions(context),
           child: Container(
             width: 90,
             height: 90,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 4),
+              border: Border.all(color: Colors.black87, width: 3),
               image: DecorationImage(
-                image: NetworkImage(userPhotos[0]),
+                image: NetworkImage("https://th.bing.com/th/id/OIP.YOCYcAmmqZOMDcP9mc2M6wHaHa?w=194&h=194&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3"),
                 fit: BoxFit.cover,
               ),
               boxShadow: [
@@ -197,40 +174,73 @@ Widget build(BuildContext context) {
   );
 }
 
-  // Header with Stats and Profile Picture
-  // Widget _buildHeader(BuildContext context) {
-  //   return Padding(
-  //     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-  //     child: Row(
-  //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //       children: [
-  //         GestureDetector(
-  //           onTap: () => _showProfileOptions(context), // Call the pop-up function
-  //           child: const CircleAvatar(
-  //             radius: 45,
-  //             backgroundColor: Color(0xFF91A1E8),
-  //             child: Text("t", style: TextStyle(fontSize: 40, color: Colors.white, fontWeight: FontWeight.w300)),
-  //           ),
-  //         ),
-  //         GestureDetector(
-  //           onTap: () => _openAchievementsScreen(context), // New function for achievements
-  //           child: Container(
-  //             padding: const EdgeInsets.all(8),
-  //             decoration: BoxDecoration(
-  //               color: Colors.grey[200], // Subtle background for the "button"
-  //               shape: BoxShape.circle,
-  //             ),
-  //           child: const Icon(Icons.import_contacts_sharp, size: 22, color: Colors.black87),
-  //           ),
-  //         ),
-  //         _buildStatColumn("$spotsCount", "spots"),
-  //         _buildStatColumn("$contributionsCount", "contributions"),
-  //         _buildProgressCircle(),
-  //       ],
-  //     ),
-  //   );
-  // }
+  // The header with the username, aligned to the right of the profile photo
+  Widget _buildNameHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          const SizedBox(width: 105), // Space for the floating photo
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 5, bottom: 10),
+              child: Text(
+                username,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF335C81),
+                ),
+              ),
+            ),
+          ),
+          // Edit Pencil Icon
+          IconButton(
+            icon: const Icon(Icons.edit, size: 20),
+            color: Colors.black87,
+            onPressed: () {
+              // TODO: Navigate to Edit Profile
+            },
+          ),
+          // Settings Gear Icon
+          IconButton(
+            icon: const Icon(Icons.settings, size: 20),
+            color: Colors.black87,
+            onPressed: () {
+              // TODO: Navigate to Settings
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // The row with Moments, Contributions, and the Passport icon
+  Widget _buildStatsAndPassport(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          _buildStatColumn("Moments", spotsCount),
+          const SizedBox(width: 20),
+          Container(width: 1, height: 30, color: Colors.grey[300]),
+          const SizedBox(width: 20),
+          _buildStatColumn("Contributions", contributionsCount),
+          
+          const SizedBox(width: 20),
 
+          IconButton(
+            icon: const Icon(Icons.badge, size: 28),
+            onPressed: () => _openAchievementsScreen(context),
+            tooltip: 'Open Achievements',
+            color: Colors.black87,
+          ),
+        ],
+      ),
+    );
+  }
+  
   // Profile Picture Options Pop-up
   void _showProfileOptions(BuildContext context) {
     showDialog(
@@ -317,7 +327,152 @@ Widget build(BuildContext context) {
     );
   }
 
-  // A collumn for the stats in the header
+  // The horizontal list of collections (Trips, Guides, etc.) with the "New Collection" box at the start
+  Widget _buildCollectionsSection() {
+    return SizedBox(
+      height: 140,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        scrollDirection: Axis.horizontal,
+        // Increase count by 1 to make room for the "New Collection" box
+        itemCount: 6, 
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            // The first item: Empty box with a plus sign
+            return _buildCollectionCard("New Collection", "add_button");
+          } // Subtract 1 from index for the actual data
+          int tripIndex = index - 1;
+          return _buildCollectionCard(
+            "Collection ${tripIndex + 1}", 
+            userPhotos[tripIndex % userPhotos.length],
+          );
+        },
+      ),
+    );
+  }
+
+  // A single card in the collections row, which can either be a collection or the "New Collection" button
+  Widget _buildCollectionCard(String title, String imageUrl) {
+    final bool isAddButton = imageUrl == "add_button";
+
+    return Container(
+      width: 115,
+      margin: const EdgeInsets.only(right: 14, top: 10, bottom: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Column(
+          children: [
+            // 1. Top Section (Image + Lock Overlay)
+            Expanded(
+              flex: 2,
+              child: Stack(
+                children: [
+                  // Background Layer (Image or Grey placeholder)
+                  Container(
+                    width: double.infinity,
+                    height: double.infinity, // Ensures it fills the Stack
+                    decoration: BoxDecoration(
+                      color: isAddButton ? Colors.white : Colors.grey[300],
+                      image: isAddButton
+                          ? null
+                          : DecorationImage(
+                              image: NetworkImage(imageUrl),
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+                    child: isAddButton
+                        ? const Center(
+                            child: Icon(
+                              Icons.add,
+                              color: Colors.black87,
+                              size: 60,
+                            ),
+                          )
+                        : null,
+                  ),
+                  // Lock Icon Overlay (Only if not the add button)
+                  if (!isAddButton)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.8),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.lock_outline,
+                            size: 18, color: Colors.black87),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // 2. Bottom Section (Text Chin)
+            Expanded(
+              flex: 1,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                alignment: Alignment.center,
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4A5568),
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  // The horizontal row with the Sort and Filter buttons, which becomes sticky when scrolling
+  Widget _buildSortFilterRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        children: [
+          const SizedBox(width: 100), // Keeps alignment consistent with the name above
+          TextButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.sort, size: 20, color: Colors.black87),
+            label: const Text("Sort", style: TextStyle(color: Colors.black87)),
+          ),
+          const SizedBox(width: 20),
+          Container(width: 1, height: 30, color: Colors.grey[300]),
+          const SizedBox(width: 20),
+          TextButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.filter_list, size: 20, color: Colors.black87),
+            label: const Text("Filter", style: TextStyle(color: Colors.black87)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Buuilds the numbers for Moments and Contributions, converting large numbers to K/M format
   Widget _buildStatColumn(String label, int count) {
     return Column(
       children: [
@@ -340,112 +495,63 @@ Widget build(BuildContext context) {
       ],
     );
   } 
+  
   // The world progress circle
   Widget _buildCircularPercentage(double percent) {
+  // Normalize percent to a value between 0.0 and 1.0 for the progress indicator
+    double progressValue = percent / 100;
+
     return Container(
-      width: 70,
-      height: 70,
+      width: 60, // Slightly larger to breathe
+      height: 60,
       decoration: const BoxDecoration(
-        color: Color(0xFF335C81),
+        color: Color(0xFF374146), // Dark slate from your image
         shape: BoxShape.circle,
         boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black26)],
       ),
-      child: Center(
-        child: Text(
-          "$percent%",
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCollectionCard(String title, String imageUrl) {
-    return Container(
-      width: 80,
-      margin: const EdgeInsets.only(right: 12),
-      child: Column(
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Container(
+          // The Progress Arc
+          SizedBox(
+            width: 70, // Slightly smaller than container to create a "border" effect
             height: 70,
-            width: 70,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              image: DecorationImage(
-                image: NetworkImage(imageUrl),
-                fit: BoxFit.cover,
+            child: CircularProgressIndicator(
+              value: progressValue,
+              strokeWidth: 8, // Adjust thickness to match image
+              backgroundColor: Colors.transparent, // Background of the track
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFFC5D9B0), // The light green from your image
               ),
+              strokeCap: StrokeCap.butt, // Square edges for the progress line
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
-            overflow: TextOverflow.ellipsis,
+          // The Text Column
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                "${percent.toInt()}%",
+                style: const TextStyle(
+                  color: Color(0xFFC5D9B0), // Matching the green
+                  fontWeight: FontWeight.w400,
+                  fontSize: 18,
+                ),
+              ),
+              const Text(
+                "World",
+                style: TextStyle(
+                  color: Color(0xFFC5D9B0),
+                  fontSize: 10,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  
-  // Building each collection card with an optional icon or image
-  Widget _collectionCard(String title, IconData? icon, String? imageUrl) {
-    return Container(
-      width: 90,
-      margin: const EdgeInsets.symmetric(horizontal: 5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (icon != null) Icon(icon, size: 30),
-          if (imageUrl != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(imageUrl, height: 50, width: 70, fit: BoxFit.cover),
-            ),
-          const SizedBox(height: 5),
-          Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-
-
-  // 4. Bottom Grid
-  Widget _buildPhotoGrid(List<String> photos) {
-    return GridView.builder(
-      shrinkWrap: true, // important
-      physics: const NeverScrollableScrollPhysics(), // important
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 2,
-        mainAxisSpacing: 2,
-      ),
-      itemCount: photos.length,
-      itemBuilder: (context, index) {
-        return Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: const Color.fromARGB(255, 196, 201, 219),
-            ),
-          ),
-          child: Image.network(
-            photos[index],
-            fit: BoxFit.cover,
-          ),
-        );
-      },
-    );
-  }
-  
   // Open the achievements screen
   void _openAchievementsScreen(context) {
     Navigator.push(
@@ -453,4 +559,23 @@ Widget build(BuildContext context) {
       MaterialPageRoute(builder: (context) => const AchievementsScreen()),
     );
   }
+}
+
+// Custom SliverPersistentHeaderDelegate for the sticky Sort & Filter bar that stays when scrolled up
+class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  _StickyHeaderDelegate({required this.child});
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return child;
+  }
+
+  @override
+  double get maxExtent => 60.0; // Adjust based on your Sort/Filter height
+  @override
+  double get minExtent => 60.0;
+  
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) => false;
 }
