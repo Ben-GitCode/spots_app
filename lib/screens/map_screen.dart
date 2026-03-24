@@ -22,6 +22,7 @@ import 'edge_function_test_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
+  
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -87,6 +88,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   }
 
   void _onMapTap() {
+    if (_profileOpen) {
+      Navigator.pop(context);
+      return;
+    }
     if (_selectedSpot != null) {
       setState(() {
         _selectedSpot = null;
@@ -593,74 +598,42 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       MaterialPageRoute(builder: (context) => const TracesScreen()),
     );
   }
-
-  // void _openProfileScreen() {
-  //   Navigator.push(
-  //     context,
-  //     MaterialPageRoute(
-  //       builder: (context) => ProfileScreen(
-  //         worldPercentage: 24,
-  //         spotsCount: 3567788,
-  //         contributionsCount: 12365,
-  //         username: "@travel_user",
-  //         userPhotos: [
-  //           "https://th.bing.com/th/id/OIP.WX9eEoyCf79l0nvM9TdlkgAAAA?w=143&h=180&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //           "https://th.bing.com/th/id/OIP.qNNbhflJ7crF62b0IqTBZQHaEK?w=328&h=185&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
+    
   void _openProfileScreen() {
-    Navigator.push(
-      context,
-      // 🔹 CHANGE THIS LINE to use the new screen you just created
-      MaterialPageRoute(builder: (context) => ProfileScrapbookScreen()),
-    );
-  }
+    _profileOpen = true;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      barrierColor: Colors.transparent, 
+      backgroundColor: Colors.transparent,
+      clipBehavior: Clip.none,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75, // 0.85
+          minChildSize: 0.75,
+          maxChildSize: 0.75,
+          expand: false,
+          builder: (context, scrollController) {
+            return ProfileScreen(
+              worldPercentage: 33,
+              spotsCount: 3567788,
+              contributionsCount: 12365,
+              username: "@travel_user",
+              scrollController: scrollController,
+              userPhotos: [
+                "https://th.bing.com/th/id/OIP.Ufv8ve9S5hVyGsMqbNwqEAHaE8?w=301&h=180&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
+                "https://th.bing.com/th/id/OIP.evi8jxbBP9Xd_hPbwyEoVAHaE8?w=245&h=180&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
+                
+                ]
+              );
+            },
+          );
+        },
+      ).whenComplete(() {
+        _profileOpen = false;
+      });
+    }
+
 
   void _openSupabaseTestScreen() {
     Navigator.push(
