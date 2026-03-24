@@ -1,7 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/map_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/services.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 🔹 2. Load the .env file
+  await dotenv.load(fileName: ".env");
+
+  // 🔹 3. Read the variables (using ! because we are certain they exist in the file)
+  String supabaseUrl = dotenv.env['SUPABASE_URL']!;
+  String supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY']!;
+
+  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
   runApp(const SpotsApp());
 }
 
