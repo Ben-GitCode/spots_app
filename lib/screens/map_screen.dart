@@ -22,7 +22,6 @@ import 'edge_function_test_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
-  
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -31,6 +30,7 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final MapController _mapController = MapController();
   final String mapTilerAPIKey = dotenv.env['MAPTILER_KEY']!;
+  bool _profileOpen = false;
 
   // Future for the cache store to ensure it's ready before the map builds
   late Future<Directory> _cacheDir;
@@ -598,13 +598,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       MaterialPageRoute(builder: (context) => const TracesScreen()),
     );
   }
-    
+
   void _openProfileScreen() {
     _profileOpen = true;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      barrierColor: Colors.transparent, 
+      barrierColor: Colors.transparent,
       backgroundColor: Colors.transparent,
       clipBehavior: Clip.none,
       builder: (context) {
@@ -623,17 +623,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               userPhotos: [
                 "https://th.bing.com/th/id/OIP.Ufv8ve9S5hVyGsMqbNwqEAHaE8?w=301&h=180&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
                 "https://th.bing.com/th/id/OIP.evi8jxbBP9Xd_hPbwyEoVAHaE8?w=245&h=180&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
-                
-                ]
-              );
-            },
-          );
-        },
-      ).whenComplete(() {
-        _profileOpen = false;
-      });
-    }
-
+              ],
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      _profileOpen = false;
+    });
+  }
 
   void _openSupabaseTestScreen() {
     Navigator.push(
