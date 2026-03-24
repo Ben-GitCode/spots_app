@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/map_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/services.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,6 +15,8 @@ Future<void> main() async {
   String supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY']!;
 
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
   runApp(const SpotsApp());
 }
 

@@ -3,6 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 
+class CapturedMedia {
+  final String path;
+  final bool isVideo;
+  final String? thumbnailPath;
+
+  CapturedMedia({
+    required this.path,
+    required this.isVideo,
+    this.thumbnailPath,
+  });
+}
+
 class CameraMediaWidget extends StatefulWidget {
   // 🔹 The callback that passes the photo path back to the main screen
   final Function(String? imagePath) onPhotoCaptured;

@@ -41,6 +41,10 @@ dependencies:
 
   camera: ^0.10.5
   record: ^6.2.0
+  video_thumbnail: ^0.5.3   # Extracts the frame from the video
+  image_cropper: 11.0.0     # Native iOS/Android photo cropping UI
+  video_player: ^2.11.1      # Plays the video in the review screen
+  video_trimmer: 5.0.0     # Gives you a professional video trimming timeline
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
