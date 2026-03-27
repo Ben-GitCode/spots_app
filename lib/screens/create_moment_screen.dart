@@ -2,18 +2,25 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:spots_app/media_widgets/audio_media_widget.dart';
-import 'package:spots_app/media_widgets/camera_media_widget.dart';
-import 'package:spots_app/media_widgets/full_screen_camera.dart';
-import 'package:spots_app/media_widgets/poll_media_widget.dart';
+// import 'package:spots_app/media_widgets/audio_media_widget.dart';
+// import 'package:spots_app/media_widgets/camera_media_widget.dart';
+// import 'package:spots_app/media_widgets/full_screen_camera.dart';
+// import 'package:spots_app/media_widgets/poll_media_widget.dart';
+import 'package:spots_app/media_attachments/media_attachment_base.dart';
+import 'package:spots_app/media_attachments/poll_attachment.dart';
+import 'package:spots_app/media_attachments/camera_attachment.dart';
+import 'package:spots_app/media_attachments/audio_attachment.dart';
+import 'package:spots_app/media_attachments/music_attachment.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-enum MediaType { text, camera, audio, music, poll, gallery }
+//enum MediaType { text, camera, audio, music, poll, gallery }
 
 class MediaOption {
-  final MediaType type;
   final String label;
   final IconData icon;
-  MediaOption(this.type, this.label, this.icon);
+  final MediaAttachment Function() createAttachment;
+
+  MediaOption(this.label, this.icon, this.createAttachment);
 }
 
 enum PrivacyLevel { public, me, group }
@@ -36,21 +43,19 @@ class CreateMomentScreen extends StatefulWidget {
 class _CreateMomentScreenState extends State<CreateMomentScreen> {
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+
+  // 🔹 THE MAGIC INGREDIENT: This key prevents the TextField from losing focus when moved
+  final GlobalKey _textFieldKey = GlobalKey();
+
   final int _maxLength = 500;
 
-  final List<MediaOption> _mediaOptions = [
-    MediaOption(MediaType.camera, "Camera", Icons.camera_alt_outlined),
-    MediaOption(MediaType.audio, "Record", Icons.mic_none),
-    MediaOption(MediaType.music, "Music", Icons.music_note_outlined),
-    MediaOption(MediaType.poll, "Poll", Icons.poll_outlined),
-  ];
-
+  MediaAttachment? _activeAttachment;
   int _centeredIndex = 0;
-  MediaType? _selectedMedia;
-  dynamic _finalMediaData;
 
   final LayerLink _privacyLayerLink = LayerLink();
   bool _isPrivacyMenuOpen = false;
+
+  bool _isUploading = false;
 
   final List<PrivacyOption> _privacyOptions = [
     PrivacyOption('1', 'Public', PrivacyLevel.public, icon: Icons.public),
@@ -61,67 +66,190 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
   ];
 
   late PrivacyOption _selectedPrivacy;
+  late final List<MediaOption> _mediaOptions;
 
   @override
   void initState() {
     super.initState();
     _selectedPrivacy = _privacyOptions[0];
 
-    // Automatically open keyboard
+    _mediaOptions = [
+      MediaOption(
+        "Camera",
+        Icons.camera_alt_outlined,
+        () => CameraAttachment(),
+      ),
+      MediaOption("Audio", Icons.mic_none, () => AudioAttachment()),
+      MediaOption("Music", Icons.music_note_outlined, () => MusicAttachment()),
+      MediaOption("Poll", Icons.poll_outlined, () => PollAttachment()),
+    ];
+
     Future.delayed(const Duration(milliseconds: 100), () {
       _focusNode.requestFocus();
     });
-    _textController.addListener(() => setState(() {}));
+
+    _textController.addListener(_updateUI);
+  }
+
+  void _updateUI() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _textController.removeListener(_updateUI);
     _textController.dispose();
     _focusNode.dispose();
+
+    _activeAttachment?.removeListener(_updateUI);
+    _activeAttachment?.dispose();
     super.dispose();
   }
 
   void _onMediaTapped() async {
     HapticFeedback.mediumImpact();
-    final selected = _mediaOptions[_centeredIndex].type;
 
-    if (selected == MediaType.camera) {
-      final CapturedMedia? result = await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const FullScreenCameraScreen()),
-      );
+    // 1. Create the attachment but don't set it as active yet
+    final pendingAttachment = _mediaOptions[_centeredIndex].createAttachment();
 
-      if (result != null) {
-        setState(() {
-          _selectedMedia = MediaType.camera;
-          _finalMediaData = result;
-        });
-      }
-    } else {
-      setState(() => _selectedMedia = selected);
+    // 2. Wait for it to do its thing (e.g., open full-screen camera)
+    final bool keep = await pendingAttachment.onSelected(context);
+
+    // 3. If the user cancelled the camera, throw the attachment away
+    if (!keep) {
+      pendingAttachment.dispose();
+      return;
     }
+
+    // 4. If successful, lock it in as the active attachment!
+    setState(() {
+      _activeAttachment?.removeListener(_updateUI);
+      _activeAttachment?.dispose();
+
+      _activeAttachment = pendingAttachment;
+      _activeAttachment?.addListener(_updateUI);
+    });
+
+    _focusNode.requestFocus();
   }
 
   void _onDiscardMedia() {
     HapticFeedback.lightImpact();
+
     setState(() {
-      _selectedMedia = null;
-      _finalMediaData = null;
+      _activeAttachment?.removeListener(_updateUI);
+      _activeAttachment?.dispose();
+      _activeAttachment = null;
     });
+
+    // 🔹 Force the keyboard to stay open when returning to normal
+    _focusNode.requestFocus();
   }
 
-  // 🔹 SMART CAPTURE LOGIC
   bool _isReadyToCapture() {
     bool textReady = _textController.text.trim().isNotEmpty;
-    bool mediaReady = _finalMediaData != null;
+    bool mediaReady = _activeAttachment?.isValid ?? false;
 
-    if (_selectedMedia == MediaType.poll) {
-      // 🔹 Polls REQUIRE both a question (text) and valid options (media)
-      return textReady && mediaReady;
+    if (_activeAttachment != null) {
+      if (_activeAttachment!.requiresText) {
+        return textReady && mediaReady;
+      }
+      return textReady || mediaReady;
     }
 
-    // For everything else, either text OR media is fine
-    return textReady || mediaReady;
+    return textReady;
+  }
+
+  Future<void> _uploadAndSaveMoment() async {
+    // 1. Lock the UI
+    setState(() => _isUploading = true);
+    HapticFeedback.heavyImpact();
+
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+
+      if (userId == null) throw Exception("User must be logged in to post.");
+
+      Map<String, dynamic>? finalMediaPayload;
+
+      // 2. Process the Media Attachment (If one exists)
+      if (_activeAttachment != null) {
+        // Grab a fresh copy of the JSON payload
+        final rawJson = Map<String, dynamic>.from(_activeAttachment!.toJson());
+        final type = rawJson['type'];
+
+        // 🔹 If it's a file, we MUST upload it to Storage first
+        if (type == 'image' || type == 'video' || type == 'audio') {
+          final localPath = rawJson['path'] as String?;
+          if (localPath != null) {
+            final file = File(localPath);
+            final fileExtension = localPath.split('.').last;
+
+            // Create a unique file path: userId/timestamp.ext
+            final storagePath =
+                '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+
+            // Upload to your Supabase bucket (Make sure 'moment_media' exists in your dashboard!)
+            await supabase.storage
+                .from('moment_media')
+                .upload(storagePath, file);
+
+            // Get the remote URL and swap it into our JSON payload
+            final remoteUrl = supabase.storage
+                .from('moment_media')
+                .getPublicUrl(storagePath);
+            rawJson['url'] = remoteUrl;
+            rawJson.remove('path'); // Delete the useless local path
+
+            // 🔹 Special Case: Video Thumbnails
+            if (type == 'video' && rawJson['thumbnail'] != null) {
+              final thumbFile = File(rawJson['thumbnail']);
+              final thumbPath =
+                  '$userId/${DateTime.now().millisecondsSinceEpoch}_thumb.jpg';
+
+              await supabase.storage
+                  .from('moment_media')
+                  .upload(thumbPath, thumbFile);
+              rawJson['thumbnail_url'] = supabase.storage
+                  .from('moment_media')
+                  .getPublicUrl(thumbPath);
+              rawJson.remove('thumbnail');
+            }
+          }
+        }
+
+        // Polls and Music bypass the storage upload completely and just pass through
+        finalMediaPayload = rawJson;
+      }
+
+      // 3. Save to the Database
+      // Make sure your table is called 'moments' and has these exact column names
+      await supabase.from('moments').insert({
+        'user_id': userId,
+        'caption': _textController.text.trim(),
+        'privacy_level': _selectedPrivacy.id,
+        'media_payload':
+            finalMediaPayload, // Supabase natively accepts JSON/Map objects here!
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // 4. Success! Close the screen
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      debugPrint("Upload Failed: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to post moment. Try again."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      // Unlock the UI if it failed so they can try again
+      if (mounted) setState(() => _isUploading = false);
+    }
   }
 
   Color _getPrivacyColor(PrivacyLevel level) {
@@ -145,21 +273,23 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
     final double mediaSlotSize = cardWidth - 24;
     final double targetCardHeight = mediaSlotSize + 140;
 
-    // 🔹 DYNAMIC UX PROPERTIES
-    final bool isPoll = _selectedMedia == MediaType.poll;
-    final String hintText = isPoll
-        ? "Ask a question..."
-        : "What happened here?...";
+    final bool isTopLayout = _activeAttachment?.isTopLayout ?? false;
+    final String hintText =
+        _activeAttachment?.hintText ?? "What happened here?...";
 
-    // 1. The Text Widget
-    Widget textFieldWidget = Padding(
+    // 1. The Text Widget (Now wrapped in AnimatedPadding with ValueKey)
+    Widget textFieldWidget = AnimatedPadding(
+      key: const ValueKey('text_widget_wrapper'),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
       padding: EdgeInsets.fromLTRB(
         16.0,
-        isPoll ? 16.0 : 0,
+        isTopLayout ? 16.0 : 0,
         16.0,
-        isPoll ? 0 : 8.0,
+        isTopLayout ? 0 : 8.0,
       ),
       child: TextField(
+        key: _textFieldKey, // 🔹 Prevents widget destruction, preserving focus!
         controller: _textController,
         focusNode: _focusNode,
         maxLines: null,
@@ -173,7 +303,7 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
-          hintText: hintText, // 🔹 Dynamic Hint!
+          hintText: hintText,
           hintStyle: TextStyle(
             color: Colors.black.withOpacity(0.25),
             fontSize: 18,
@@ -185,21 +315,24 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
       ),
     );
 
-    // 2. The Media Widget
-    Widget mediaSlotWidget = Padding(
+    // 2. The Media Widget (Now wrapped in AnimatedPadding with ValueKey)
+    Widget mediaSlotWidget = AnimatedPadding(
+      key: const ValueKey('media_widget_wrapper'),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
       padding: const EdgeInsets.all(12.0),
       child: AnimatedSize(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
         alignment: Alignment.topCenter,
-        child: _selectedMedia == null
+        child: _activeAttachment == null
             ? _buildMediaSelectionWheel()
-            : _buildActiveMediaSlot(mediaSlotSize),
+            : _buildActiveMediaSlot(),
       ),
     );
 
-    // 🔹 The Swapper: Determines rendering order based on media type!
-    List<Widget> scrollableContent = isPoll
+    // 🔹 The Swapper: Determines rendering order
+    List<Widget> scrollableContent = isTopLayout
         ? [textFieldWidget, mediaSlotWidget]
         : [mediaSlotWidget, textFieldWidget];
 
@@ -220,7 +353,6 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
             SafeArea(
               child: Column(
                 children: [
-                  // A. TOP BAR
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16.0,
@@ -243,12 +375,16 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
                     ),
                   ),
 
-                  // B. THE SMART VIEWPORT POLAROID
                   Expanded(
                     child: Align(
                       alignment: Alignment.topCenter,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        // 🔹 FIX 1: Added bottom padding so it never sits flush with the keyboard!
+                        padding: const EdgeInsets.only(
+                          left: 24.0,
+                          right: 24.0,
+                          bottom: 15.0,
+                        ),
                         child: Container(
                           constraints: BoxConstraints(
                             maxHeight: targetCardHeight,
@@ -259,16 +395,17 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
                             border: Border.all(color: Colors.white, width: 1.5),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
-                                blurRadius: 40,
-                                offset: const Offset(0, 20),
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 30,
+                                spreadRadius:
+                                    5, // Spreads the shadow outward past the edges
+                                offset: const Offset(0, 15),
                               ),
                             ],
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // 1. SCROLLABLE INNER CONTENT (Dynamically Swapped!)
                               Expanded(
                                 child: GestureDetector(
                                   onTap: () => _focusNode.requestFocus(),
@@ -278,14 +415,12 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
-                                      // 🔹 Instantly swaps the layout!
                                       children: scrollableContent,
                                     ),
                                   ),
                                 ),
                               ),
 
-                              // 2. PINNED FOOTER
                               Padding(
                                 padding: const EdgeInsets.only(
                                   left: 12.0,
@@ -316,15 +451,14 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
                                         ),
                                       ),
                                     ),
+
                                     Material(
                                       color: Colors.transparent,
                                       child: InkWell(
                                         borderRadius: BorderRadius.circular(20),
-                                        onTap: canCapture
-                                            ? () {
-                                                HapticFeedback.heavyImpact();
-                                                Navigator.pop(context);
-                                              }
+                                        // 🔹 Disable the tap if uploading OR not ready
+                                        onTap: (canCapture && !_isUploading)
+                                            ? _uploadAndSaveMoment
                                             : null,
                                         child: AnimatedContainer(
                                           duration: const Duration(
@@ -352,16 +486,27 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
                                                 ? null
                                                 : Colors.black.withOpacity(0.1),
                                           ),
-                                          child: Text(
-                                            "Capture",
-                                            style: TextStyle(
-                                              color: canCapture
-                                                  ? Colors.white
-                                                  : Colors.black26,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 15,
-                                            ),
-                                          ),
+                                          // 🔹 Swap text for a spinner during upload!
+                                          child: _isUploading
+                                              ? const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        color: Colors.white,
+                                                        strokeWidth: 2.5,
+                                                      ),
+                                                )
+                                              : Text(
+                                                  "Capture",
+                                                  style: TextStyle(
+                                                    color: canCapture
+                                                        ? Colors.white
+                                                        : Colors.black26,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 15,
+                                                  ),
+                                                ),
                                         ),
                                       ),
                                     ),
@@ -378,7 +523,6 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
               ),
             ),
 
-            // 🔹 PRIVACY MENU OVERLAY
             if (_isPrivacyMenuOpen) ...[
               Positioned.fill(
                 child: GestureDetector(
@@ -415,13 +559,9 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
     );
   }
 
-  Widget _buildActiveMediaSlot(double squareSize) {
-    final bool isCamera = _selectedMedia == MediaType.camera;
-    final bool hasCapturedMedia = isCamera && _finalMediaData is CapturedMedia;
-
+  Widget _buildActiveMediaSlot() {
     return Container(
       width: double.infinity,
-      height: isCamera ? squareSize : null,
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E2A),
         borderRadius: BorderRadius.circular(8),
@@ -429,36 +569,8 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
       clipBehavior: Clip.hardEdge,
       child: Stack(
         children: [
-          Container(
-            width: double.infinity,
-            height: isCamera ? squareSize : null,
-            child: isCamera && hasCapturedMedia
-                ? Image.file(
-                    File(
-                      (_finalMediaData as CapturedMedia).isVideo
-                          ? (_finalMediaData as CapturedMedia).thumbnailPath!
-                          : (_finalMediaData as CapturedMedia).path,
-                    ),
-                    fit: BoxFit.cover,
-                  )
-                : _buildSpecificMediaUI(),
-          ),
-
-          if (isCamera &&
-              hasCapturedMedia &&
-              (_finalMediaData as CapturedMedia).isVideo)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black26,
-                child: const Center(
-                  child: Icon(
-                    Icons.play_circle_fill,
-                    color: Colors.white,
-                    size: 48,
-                  ),
-                ),
-              ),
-            ),
+          if (_activeAttachment != null)
+            _activeAttachment!.buildEditor(context),
 
           Positioned(
             top: 8,
@@ -480,24 +592,53 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
     );
   }
 
-  Widget _buildSpecificMediaUI() {
-    switch (_selectedMedia) {
-      case MediaType.audio:
-        return AudioMediaWidget(
-          onAudioCaptured: (String path) =>
-              setState(() => _finalMediaData = path),
-        );
-      case MediaType.poll:
-        return PollMediaWidget(
-          onPollUpdated: (optionsList) =>
-              setState(() => _finalMediaData = optionsList),
-        );
-      default:
-        return const SizedBox();
-    }
+  Widget _buildMediaSelectionWheel() {
+    return Container(
+      key: const ValueKey('selection_wheel'),
+      height: 140,
+      decoration: BoxDecoration(
+        color: const Color(0xFF141418),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.black38, width: 1.5),
+      ),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _mediaOptions.length,
+        itemBuilder: (context, index) {
+          final option = _mediaOptions[index];
+          return GestureDetector(
+            onTap: () {
+              setState(() => _centeredIndex = index);
+              _onMediaTapped();
+            },
+            child: Container(
+              width: 87,
+              color: Colors.transparent,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(option.icon, color: Colors.white, size: 36),
+                  const SizedBox(height: 12),
+                  Text(
+                    option.label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
-
-  // --- PRIVACY COMPONENT BUILDERS ---
 
   Widget _buildPrivacyToggleButton() {
     return GestureDetector(
@@ -656,55 +797,6 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildMediaSelectionWheel() {
-    return Container(
-      key: const ValueKey('selection_wheel'),
-      height: 140,
-      decoration: BoxDecoration(
-        color: const Color(0xFF141418),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.black38, width: 1.5),
-      ),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _mediaOptions.length,
-        itemBuilder: (context, index) {
-          final option = _mediaOptions[index];
-          return GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _centeredIndex = index);
-              _onMediaTapped();
-            },
-            child: Container(
-              width: 87,
-              color: Colors.transparent,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(option.icon, color: Colors.white, size: 36),
-                  const SizedBox(height: 12),
-                  Text(
-                    option.label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
       ),
     );
   }

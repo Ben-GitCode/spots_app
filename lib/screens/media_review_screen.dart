@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_trimmer/video_trimmer.dart';
-import 'package:spots_app/media_widgets/camera_media_widget.dart';
+import 'package:spots_app/media_attachments/camera_attachment.dart';
 
 class MediaReviewScreen extends StatefulWidget {
   final CapturedMedia media;

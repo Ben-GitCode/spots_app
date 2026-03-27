@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
-import 'camera_media_widget.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:spots_app/screens/media_review_screen.dart';
+import 'package:spots_app/media_attachments/camera_attachment.dart';
 
 class FullScreenCameraScreen extends StatefulWidget {
   const FullScreenCameraScreen({super.key});
