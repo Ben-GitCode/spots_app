@@ -73,6 +73,28 @@
 	<string>We need access to your microphone to record audio moments.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to save your moments.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to show where you are on the map.</string>
+
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+		<string>baidumap</string>
+		<string>iosamap</string>
+		<string>waze</string>
+		<string>yandexmaps</string>
+		<string>yandexnavi</string>
+		<string>citymapper</string>
+		<string>mapswithme</string>
+		<string>osmandmaps</string>
+		<string>dgis</string>
+		<string>qqmap</string>
+		<string>here-location</string>
+		<string>tomtomgo</string>
+		<string>copilot</string>
+		<string>sygic</string>
+		<string>flitsmeister</string>
+	</array>
 
 </dict>
 </plist>

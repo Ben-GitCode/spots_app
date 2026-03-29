@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:map_launcher/map_launcher.dart';
 import 'package:flutter_map_cache/flutter_map_cache.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio_cache_interceptor_file_store/dio_cache_interceptor_file_store.dart';
 import 'package:spots_app/screens/spot_display_screen.dart';
 import 'dart:io';
+import 'dart:async';
 
 import 'profile_screen.dart';
 import 'create_moment_screen.dart';
@@ -32,13 +36,174 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final String mapTilerAPIKey = dotenv.env['MAPTILER_KEY']!;
   bool _profileOpen = false;
 
+  // 🔹 Streams to control the "Lock-on" behavior
+  late AlignOnUpdate _alignPositionOnUpdate;
+  late final StreamController<double?> _alignPositionStreamController;
+
+  bool _hasPermissions = false;
+
   // Future for the cache store to ensure it's ready before the map builds
   late Future<Directory> _cacheDir;
+
+  // 🔹 1. NEW VARIABLES FOR PROXIMITY MATH
+  LatLng? _currentLocation;
+  StreamSubscription<Position>? _positionStreamSubscription;
 
   @override
   void initState() {
     super.initState();
     _cacheDir = getTemporaryDirectory(); // Get a place to store tiles
+
+    // 🔹 Initialize location tracking streams
+    _alignPositionOnUpdate = AlignOnUpdate.always; // Start locked on
+    _alignPositionStreamController = StreamController<double?>();
+    _checkLocationPermissions();
+  }
+
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel();
+    _alignPositionStreamController.close();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  // 🔹 Permission Check Logic
+  Future<void> _checkLocationPermissions() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showErrorSnackBar("Please enable location services.");
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _showPreciseLocationDialog(
+        "Location permissions are permanently denied. We need them to show your Spots.",
+      );
+      return;
+    }
+
+    // 🔹 THE HARD GATE: Check for Precise vs Approximate
+    final accuracy = await Geolocator.getLocationAccuracy();
+
+    if (accuracy == LocationAccuracyStatus.reduced) {
+      // The user chose "Approximate". We halt everything and force them to Settings.
+      _showPreciseLocationDialog(
+        "Spots relies on your exact location to physically unlock nearby areas. Please open Settings and toggle 'Precise Location' to ON.",
+      );
+      return; // ⛔️ HALT: Do not set _hasPermissions to true
+    }
+
+    // If we made it here, they gave us standard, permanent Precise Location!
+    setState(() {
+      _hasPermissions = true;
+    });
+
+    _startLocationTracking();
+  }
+
+  // 🔹 Call this at the very end of your _checkLocationPermissions() method!
+  void _startLocationTracking() {
+    // Only update the stream if the user moves at least 3 meters
+    // (Saves massive amounts of battery compared to continuous updates)
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.best, // We already forced precise!
+      distanceFilter: 3,
+    );
+
+    _positionStreamSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: locationSettings,
+        ).listen((Position? position) {
+          if (position != null && mounted) {
+            setState(() {
+              _currentLocation = LatLng(position.latitude, position.longitude);
+            });
+          }
+        });
+  }
+
+  // 🔹 The UX prompt that routes them to the iOS/Android Settings app
+  void _showPreciseLocationDialog(String message) {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Force them to interact with the dialog
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: const Color(0xFF1E1E2A),
+          title: const Text(
+            "Precise Location Required",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(color: Colors.white70, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(context), // Let them cancel and stay locked out
+              child: const Text(
+                "Cancel",
+                style: TextStyle(color: Colors.white54),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () async {
+                Navigator.pop(context);
+                // 🔹 This magic line opens the OS Settings exactly on your App's page
+                await Geolocator.openAppSettings();
+              },
+              child: const Text(
+                "Open Settings",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  // 🔹 The Target Button Action
+  void _lockOnUser() {
+    setState(() {
+      _alignPositionOnUpdate = AlignOnUpdate.always;
+    });
+    // Snap the camera back to the user at zoom level 16.0
+    _alignPositionStreamController.add(16.0);
   }
 
   Spot? _selectedSpot;
@@ -77,12 +242,26 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         SpotReactions.insightful: 40,
       },
     ),
+    Spot(
+      id: '4',
+      ownerId: 'user_4',
+      title: "Far Far Away",
+      description: "km test",
+      location: const LatLng(32.1763, 34.9589),
+      type: SpotTypes.private,
+      reactionCounts: {
+        SpotReactions.support: 30,
+        SpotReactions.wholesome: 12,
+        SpotReactions.insightful: 40,
+      },
+    ),
   ];
 
   void _onSpotTap(Spot spot) {
     setState(() {
       _selectedSpot = spot;
       _isMoving = true;
+      _alignPositionOnUpdate = AlignOnUpdate.never;
     });
     _animatedMapMove(spot.location, 16.0);
   }
@@ -102,11 +281,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 1. Wrap in FutureBuilder to provide the 'snapshot' context
       body: FutureBuilder<Directory>(
         future: _cacheDir,
         builder: (context, snapshot) {
-          // Show a loader while the app finds the cache directory
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -123,41 +300,44 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   interactionOptions: const InteractionOptions(
                     flags: InteractiveFlag.all,
                   ),
+                  // 🔹 Break the lock if the user physically drags the map
+                  onPositionChanged: (MapPosition position, bool hasGesture) {
+                    if (hasGesture &&
+                        _alignPositionOnUpdate == AlignOnUpdate.always) {
+                      setState(() {
+                        _alignPositionOnUpdate = AlignOnUpdate.never;
+                      });
+                    }
+                  },
                 ),
                 children: [
                   TileLayer(
-                    // FOR FREE TESTING
-
-                    // 1. Updated to the standard public OSM tile server
                     urlTemplate:
                         "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-
-                    // Good that you have this! OSM requires a valid User-Agent.
                     userAgentPackageName: "com.example.spotsapp",
-
-                    // 2. Disabled retina mode as standard OSM doesn't support it natively
                     retinaMode: false,
-
                     tileDisplay: const TileDisplay.fadeIn(
                       duration: Duration(milliseconds: 300),
                     ),
-
-                    // FOR PRODUCTION USE
-
-                    // urlTemplate:
-                    //     "https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=$mapTilerAPIKey",
-                    // userAgentPackageName: "com.example.spotsapp",
-                    // // Use retina mode only if device pixel ratio allows it
-                    // retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
-                    // tileDisplay: const TileDisplay.fadeIn(
-                    //   duration: Duration(milliseconds: 300),
-                    // ),
-
-                    // // 5. THE MAGIC FIX: snapshot is now defined here!
-                    // tileProvider: CachedTileProvider(
-                    //   store: FileCacheStore("${snapshot.data!.path}/map_tiles"),
-                    // ),
                   ),
+
+                  // 🔹 The Magic Location Marker Layer
+                  if (_hasPermissions)
+                    CurrentLocationLayer(
+                      alignPositionStream:
+                          _alignPositionStreamController.stream,
+                      alignPositionOnUpdate: _alignPositionOnUpdate,
+                      style: LocationMarkerStyle(
+                        marker: const DefaultLocationMarker(
+                          color: Colors.blueAccent,
+                        ),
+                        markerSize: const Size(24, 24),
+                        showHeadingSector:
+                            true, // 🔹 Enables the rotation compass
+                        headingSectorColor: Colors.blueAccent.withOpacity(0.3),
+                        headingSectorRadius: 60,
+                      ),
+                    ),
 
                   /// LAYER 1: THE DOTS / PINS
                   MarkerLayer(
@@ -169,7 +349,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         height: isSelected ? 60 : 45,
                         point: spot.location,
                         rotate: true,
-                        alignment: Alignment.topCenter,
+                        // alignment: isSelected
+                        //     ? Alignment.center
+                        //     : Alignment.center,
+                        // alignment: Alignment.topCenter,
+                        alignment: Alignment.center,
                         key: ValueKey(spot.id),
                         child: GestureDetector(
                           onTap: () => _onSpotTap(spot),
@@ -221,26 +405,24 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: 15),
+                    // 🔹 Updated Target Button
                     FloatingActionButton(
                       heroTag: "location",
                       shape: const CircleBorder(),
                       backgroundColor: Colors.white,
                       elevation: 4,
-                      onPressed: () {},
-                      child: const Icon(Icons.my_location, color: Colors.black),
+                      onPressed: _hasPermissions
+                          ? _lockOnUser
+                          : _checkLocationPermissions,
+                      child: Icon(
+                        _alignPositionOnUpdate == AlignOnUpdate.always
+                            ? Icons.my_location_rounded
+                            : Icons.location_searching_rounded,
+                        color: _alignPositionOnUpdate == AlignOnUpdate.always
+                            ? Colors.blueAccent
+                            : Colors.black54,
+                      ),
                     ),
-                    // const SizedBox(height: 15),
-                    // FloatingActionButton(
-                    //   heroTag: "supabaseTest",
-                    //   shape: const CircleBorder(),
-                    //   backgroundColor: Colors.white,
-                    //   elevation: 4,
-                    //   onPressed: _openSupabaseTestScreen,
-                    //   child: const Icon(
-                    //     Icons.temple_buddhist,
-                    //     color: Colors.black,
-                    //   ),
-                    // ),
                   ],
                 ),
               ),
@@ -271,22 +453,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       (sum, count) => sum + count,
     );
 
-    // 2. PROXIMITY LOGIC (Near vs Far)
-    // // MOCK USER LOCATION (Imagine the user is standing in Tel Aviv)
-    // // Later, you will get this from the geolocator package!
-    // final myCurrentLocation = const LatLng(32.1780, 34.9070);
+    // 🔹 2. THE LOCAL PROXIMITY MATH
+    bool isNear = false;
+    double? distanceInMeters;
 
-    // // Calculate distance in meters using latlong2
-    // const Distance distanceCalculator = Distance();
-    // final double distanceInMeters = distanceCalculator.as(
-    //   LengthUnit.Meter,
-    //   myCurrentLocation,
-    //   spot.location,
-    // );
+    if (_currentLocation != null) {
+      // The Distance() class uses the Haversine formula to account for the curvature of the Earth
+      const Distance distanceCalculator = Distance();
 
-    // // If they are within 100 meters, unlock the preview!
-    // bool isNear = distanceInMeters <= 100;
-    bool isNear = true;
+      distanceInMeters = distanceCalculator.as(
+        LengthUnit.Meter,
+        _currentLocation!,
+        spot.location,
+      );
+
+      // Unlock threshold: 10 meters
+      isNear = distanceInMeters <= 10;
+    }
 
     return GestureDetector(
       onTap: () {},
@@ -403,7 +586,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 15),
 
             // --- BOTTOM: The Dynamic "Preview" Box ---
             if (isNear)
@@ -419,9 +602,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 },
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 25),
                   decoration: BoxDecoration(
-                    color: Colors.black, // Or use a vibrant "active" color
+                    color: Color.fromARGB(255, 134, 166, 65),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Center(
@@ -430,47 +613,158 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: 16,
                       ),
                     ),
                   ),
                 ),
               )
             else
-              // STATE 2: FAR AWAY (Locked State)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Column(
-                  children: [
-                    Text(
-                      "Preview Not Available",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+              // STATE 2: FAR AWAY (Navigation State)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Go Near spot To View",
+                    style: TextStyle(
+                      color: Color(0xFF335C81), // Matched your dark blue header
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: () => _openNavigationSheet(spot),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blueAccent.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _formatDistance(distanceInMeters),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const Icon(
+                            Icons.directions, // Cool navigation arrow
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(height: 6),
-                    Text(
-                      "Go Near Spot To View",
-                      style: TextStyle(
-                        color: Color(0xFF81D4FA),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ), // Light blue text
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
           ],
         ),
       ),
     );
+  }
+
+  // 🔹 Formats distance: meters if under 1km, kilometers if over
+  String _formatDistance(double? meters) {
+    if (meters == null) return "Locating...";
+
+    if (meters < 1000) {
+      return "${meters.ceil()}m away";
+    } else {
+      // Divides by 1000 and shows 1 decimal place (e.g., 1.2km)
+      return "${(meters / 1000).toStringAsFixed(1)}km away";
+    }
+  }
+
+  // 🔹 Opens the Navigation Bottom Sheet
+  void _openNavigationSheet(Spot spot) async {
+    try {
+      final availableMaps = await MapLauncher.installedMaps;
+
+      // 🔹 1. Check if the widget is still alive after the async call
+      if (!mounted) return;
+
+      // 🔹 2. Handle the edge case where NO maps are installed
+      if (availableMaps.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("No navigation apps found on this device."),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return; // Halt execution here
+      }
+
+      // 🔹 3. Show the bottom sheet if maps exist
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (BuildContext context) {
+          return SafeArea(
+            child: SingleChildScrollView(
+              child: Wrap(
+                children: <Widget>[
+                  const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(
+                      "Navigate to Spot",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  for (var map in availableMaps)
+                    ListTile(
+                      onTap: () {
+                        // 🔹 4. Close the bottom sheet FIRST
+                        Navigator.pop(context);
+
+                        // Then launch the external map app
+                        map.showMarker(
+                          coords: Coords(
+                            spot.location.latitude,
+                            spot.location.longitude,
+                          ),
+                          title: spot.title,
+                        );
+                      },
+                      title: Text(map.mapName),
+                      leading: SvgPicture.asset(
+                        map.icon,
+                        height: 30.0,
+                        width: 30.0,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint("Navigation Error: $e");
+    }
   }
 
   // Widget _buildSelectedPin() {
@@ -484,13 +778,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   //   );
   // }
   Widget _buildSelectedPin() {
-    return SvgPicture.asset(
-      'assets/icons/PushPin.svg', // 🔹 MUST MATCH YOUR ACTUAL FILE NAME
-      width: 55,
-      height: 55,
-      // Optional: If you want to force the SVG to be red, uncomment the line below.
-      // If your SVG is already the perfect color, leave this commented out!
-      // colorFilter: const ColorFilter.mode(Colors.red, BlendMode.srcIn),
+    return Transform.translate(
+      // 🔹 Tweak these X and Y values until the needle is perfectly locked onto the spot!
+      // Negative Y moves it UP. Negative X moves it LEFT.
+      offset: const Offset(-11, 7),
+      child: SvgPicture.asset(
+        'assets/icons/PushPin.svg',
+        width: 55,
+        height: 55,
+      ),
     );
   }
 
@@ -641,32 +937,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-  // void _openCreateMomentScreen() {
-  //   final myCurrentLocation = const LatLng(32.1624, 34.8447);
-
-  //   Navigator.push(
-  //     context,
-  //     PageRouteBuilder(
-  //       pageBuilder: (context, animation, secondaryAnimation) {
-  //         return CreateMomentScreen();
-  //       },
-  //       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-  //         const begin = Offset(0.0, 1.0);
-  //         const end = Offset.zero;
-  //         const curve = Curves.easeOutCubic;
-
-  //         var tween = Tween(
-  //           begin: begin,
-  //           end: end,
-  //         ).chain(CurveTween(curve: curve));
-  //         var offsetAnimation = animation.drive(tween);
-
-  //         return SlideTransition(position: offsetAnimation, child: child);
-  //       },
-  //       transitionDuration: const Duration(milliseconds: 250),
-  //     ),
-  //   );
-  // }
   void _openCreateMomentScreen() {
     Navigator.push(
       context,
