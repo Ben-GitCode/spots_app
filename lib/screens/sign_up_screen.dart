@@ -47,7 +47,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
         final newUser = UserData(
           userID: user.id,
           username: nameController.text.trim(),
-          profilePictureUrl: "https://nyprkwgliwnyktcqsfsf.supabase.co/storage/v1/object/public/profile_pictures/clker-free-vector-images-profile-42914.svg", 
+          profilePictureUrl: "https://nyprkwgliwnyktcqsfsf.supabase.co/storage/v1/object/public/profile_pictures/wanderercreative-blank-profile-picture-973460_640.png", 
           dataJoined: DateTime.now(),
           worldPercentage: 0,
           contributionsCount: 0,

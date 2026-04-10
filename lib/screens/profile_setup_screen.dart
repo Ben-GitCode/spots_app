@@ -52,13 +52,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
 
-    print("DEBUG: User ID is ${user?.id}");
-    print("DEBUG: Access Token exists: ${supabase.auth.currentSession?.accessToken != null}");
-    
     try {
       // 1. Determine the Image URL
       String? imageUrl;
-      const String defaultUrl = "https://nyprkwgliwnyktcqsfsf.supabase.co/storage/v1/object/public/profile_pictures/clker-free-vector-images-profile-42914.svg";
+      const String defaultUrl = "https://nyprkwgliwnyktcqsfsf.supabase.co/storage/v1/object/public/profile_pictures/wanderercreative-blank-profile-picture-973460_640.png";
 
       if (_imageFile != null && user != null) {
         final fileName = '${user.id}_profile.jpg';
@@ -80,11 +77,20 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         UserAttributes(data: {'profile_picture_url': imageUrl}),
       );
 
+      // 3. Call your Postgres Function (RPC)
+      // Make sure 'create_user_profile' exists in your Database -> Functions
+      final String username = user?.userMetadata?['name'] ?? "New User";
+      
+      await supabase.rpc('create_user_profile', params: {
+        'p_username': username,
+        'p_profile_picture': imageUrl,
+      });
+
       // 3. Initialize your UserData class
       // Note: 'user.userMetadata' contains the name from the Signup screen
       final newUserData = UserData(
         userID: user!.id,
-        username: user.userMetadata?['name'] ?? "New User",
+        username: username,
         profilePictureUrl: imageUrl,
         dataJoined: DateTime.now(),
         worldPercentage: 0,
