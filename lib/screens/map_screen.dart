@@ -9,13 +9,13 @@ import 'package:flutter_map_cache/flutter_map_cache.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio_cache_interceptor_file_store/dio_cache_interceptor_file_store.dart';
 import 'package:spots_app/screens/spot_display_screen.dart';
+import 'package:spots_app/components/overlapping_reaction_stack.dart';
 import 'dart:io';
 import 'dart:async';
 
 import 'profile_screen.dart';
 import 'create_moment_screen.dart';
 import 'package:spots_app/utils/models.dart';
-import 'spot_details_screen.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'traces_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -373,10 +373,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                           rotate: true,
                           point: _selectedSpot!.location,
                           width: 250,
-                          height: 275,
+                          height: 245,
                           alignment: Alignment.topCenter,
                           child: Padding(
-                            padding: const EdgeInsets.only(bottom: 65),
+                            padding: const EdgeInsets.only(bottom: 30),
                             child: _buildPopup(_selectedSpot!),
                           ),
                         ),
@@ -538,31 +538,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               children: [
                 // Overlapping Emojis Stack
                 if (topReactions.isNotEmpty)
-                  SizedBox(
-                    // Dynamically size width based on how many emojis we have (up to 3)
-                    width: 32.0 + ((topReactions.length - 1) * 20.0),
-                    height: 32,
-                    child: Stack(
-                      children: List.generate(topReactions.length, (index) {
-                        return Positioned(
-                          left:
-                              index *
-                              20.0, // Shift each emoji 20px to the right
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(
-                                0xFFF8F7F2,
-                              ), // Matches bg to prevent transparency bleed
-                            ),
-                            child: Text(
-                              spot.getEmojiForReaction(topReactions[index]),
-                              style: const TextStyle(fontSize: 26),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
+                  OverlappingReactionStack(
+                    reactions: topReactions,
+                    totalReactions: totalReactions,
+                    outlineColor: Color(0xFFF8F7F2),
+                    counterTextColor: Colors.black87,
                   )
                 else
                   const Text(
@@ -805,7 +785,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         ],
       ),
       child: Center(
-        child: Text(spot.topEmoji, style: const TextStyle(fontSize: 20)),
+        child: Image.asset(spot.topReactionAsset, width: 25, height: 25),
+        // child: Text(spot.topEmoji, style: const TextStyle(fontSize: 20)),
       ),
     );
   }

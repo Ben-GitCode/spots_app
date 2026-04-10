@@ -3,30 +3,51 @@ import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:spots_app/utils/models.dart';
+import 'package:spots_app/components/overlapping_reaction_stack.dart';
+import 'package:intl/intl.dart';
+
+// Helper to format large numbers (e.g., 145000 -> 145K)
+String formatReactionsCount(int count) {
+  if (count >= 1000) {
+    return '${(count / 1000).toStringAsFixed(count % 1000 == 0 ? 0 : 1)}K';
+  }
+  return count.toString();
+}
+
+String formatNumberWithCommas(int count) {
+  var formatter = NumberFormat('#,###,###');
+  return formatter.format(count);
+}
 
 // ============================================================================
-// 🔹 1. THE POLYMORPHIC MEDIA ARCHITECTURE
+// 🔹 2. THE POLYMORPHIC MEDIA ARCHITECTURE
 // ============================================================================
-
 abstract class MomentMedia {
   Widget buildPreview(BuildContext context);
   Widget buildExpanded(BuildContext context);
 
   factory MomentMedia.fromJson(Map<String, dynamic> json) {
     final type = json['type'];
-    if (type == 'photo') return PhotoMedia(json['url']);
-    if (type == 'text') return TextMedia(json['text']);
-    if (type == 'poll')
+    if (type == 'photo') {
+      return PhotoMedia(json['url']);
+    }
+    if (type == 'text') {
+      return TextMedia(json['text']);
+    }
+    if (type == 'poll') {
       return PollMedia(
         json['question'] ?? 'Poll',
         List<String>.from(json['options'] ?? []),
       );
-    if (type == 'audio')
+    }
+    if (type == 'audio') {
       return AudioMedia(
         json['title'] ?? 'Voice Note',
         json['duration'] ?? '0:00',
         json['url'] ?? '',
       );
+    }
     if (type == 'music') {
       return MusicMedia(
         json['song_title'] ?? 'Unknown Song',
@@ -43,11 +64,9 @@ abstract class MomentMedia {
 class PhotoMedia implements MomentMedia {
   final String url;
   PhotoMedia(this.url);
-
   @override
   Widget buildPreview(BuildContext context) =>
       Image.network(url, fit: BoxFit.cover);
-
   @override
   Widget buildExpanded(BuildContext context) =>
       Image.network(url, fit: BoxFit.cover, width: double.infinity);
@@ -56,7 +75,6 @@ class PhotoMedia implements MomentMedia {
 class TextMedia implements MomentMedia {
   final String text;
   TextMedia(this.text);
-
   @override
   Widget buildPreview(BuildContext context) {
     return Container(
@@ -85,16 +103,22 @@ class TextMedia implements MomentMedia {
       width: double.infinity,
       color: const Color(0xFFE8E5D9),
       child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(), // Main card scrolls
         padding: const EdgeInsets.all(32),
-        physics: const BouncingScrollPhysics(),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-            height: 1.4,
-          ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+                height: 1.4,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -105,7 +129,6 @@ class PollMedia implements MomentMedia {
   final String question;
   final List<String> options;
   PollMedia(this.question, this.options);
-
   @override
   Widget buildPreview(BuildContext context) {
     return Container(
@@ -138,8 +161,8 @@ class PollMedia implements MomentMedia {
       width: double.infinity,
       color: const Color(0xFF3A5A78),
       child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(), // Main card scrolls
         padding: const EdgeInsets.all(32),
-        physics: const BouncingScrollPhysics(),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
@@ -184,14 +207,12 @@ class PollMedia implements MomentMedia {
   }
 }
 
-// 🔹 1. UPDATE THE MEDIA CLASSES TO ACCEPT URLS
 class MusicMedia implements MomentMedia {
   final String songTitle;
   final String artist;
   final String albumArtUrl;
   final String previewUrl;
   final Map<String, dynamic> platformLinks;
-
   MusicMedia(
     this.songTitle,
     this.artist,
@@ -199,7 +220,6 @@ class MusicMedia implements MomentMedia {
     this.previewUrl,
     this.platformLinks,
   );
-
   @override
   Widget buildPreview(BuildContext context) {
     return Container(
@@ -233,10 +253,8 @@ class MusicMedia implements MomentMedia {
 class AudioMedia implements MomentMedia {
   final String title;
   final String duration;
-  final String audioUrl; // 🔹 Added so the cassette can play!
-
+  final String audioUrl;
   AudioMedia(this.title, this.duration, this.audioUrl);
-
   @override
   Widget buildPreview(BuildContext context) {
     return Container(
@@ -267,17 +285,15 @@ class UnknownMedia implements MomentMedia {
 }
 
 // ============================================================================
-// 🔹 2. THE INTERACTIVE PLAYERS (Stateful Widgets for Animation)
+// 🔹 3. INTERACTIVE AUDIO PLAYERS
 // ============================================================================
 
-// 🔹 THE UPGRADED VINYL PLAYER (With Odesli Deep Links)
 class SpinningVinylPlayer extends StatefulWidget {
   final String songTitle;
   final String artist;
   final String albumArtUrl;
   final String previewUrl;
   final Map<String, dynamic> platformLinks;
-
   const SpinningVinylPlayer({
     super.key,
     required this.songTitle,
@@ -286,7 +302,6 @@ class SpinningVinylPlayer extends StatefulWidget {
     required this.previewUrl,
     required this.platformLinks,
   });
-
   @override
   State<SpinningVinylPlayer> createState() => _SpinningVinylPlayerState();
 }
@@ -294,9 +309,8 @@ class SpinningVinylPlayer extends StatefulWidget {
 class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  final AudioPlayer _audioPlayer = AudioPlayer(); // 🔹 just_audio Engine
+  final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
-
   @override
   void initState() {
     super.initState();
@@ -310,26 +324,22 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
   Future<void> _initAudio() async {
     try {
       await _audioPlayer.setUrl(widget.previewUrl);
-
-      // Listen for the exact moment the stream finishes
       _audioPlayer.playerStateStream.listen((state) {
         if (state.processingState == ProcessingState.completed && mounted) {
           setState(() {
             _isPlaying = false;
             _controller.stop();
-            _audioPlayer.seek(Duration.zero); // Reset needle to start
+            _audioPlayer.seek(Duration.zero);
           });
         }
       });
-    } catch (e) {
-      debugPrint("Error loading audio: $e");
-    }
+    } catch (e) {}
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _audioPlayer.dispose(); // Instantly kills audio when screen is swiped away
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -352,9 +362,7 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
     try {
       if (!await launchUrl(url, mode: LaunchMode.externalApplication))
         debugPrint("Could not launch $url");
-    } catch (e) {
-      debugPrint("Error launching app: $e");
-    }
+    } catch (e) {}
   }
 
   @override
@@ -369,8 +377,9 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
         ),
       ),
       child: SingleChildScrollView(
+        physics:
+            const NeverScrollableScrollPhysics(), // Allows main card to scroll seamlessly
         padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
-        physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
             Stack(
@@ -563,14 +572,12 @@ class CassetteTapePlayer extends StatefulWidget {
   final String title;
   final String duration;
   final String audioUrl;
-
   const CassetteTapePlayer({
     super.key,
     required this.title,
     required this.duration,
     required this.audioUrl,
   });
-
   @override
   State<CassetteTapePlayer> createState() => _CassetteTapePlayerState();
 }
@@ -578,9 +585,8 @@ class CassetteTapePlayer extends StatefulWidget {
 class _CassetteTapePlayerState extends State<CassetteTapePlayer>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  final AudioPlayer _audioPlayer = AudioPlayer(); // 🔹 just_audio Engine
+  final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
-
   @override
   void initState() {
     super.initState();
@@ -603,9 +609,7 @@ class _CassetteTapePlayerState extends State<CassetteTapePlayer>
           });
         }
       });
-    } catch (e) {
-      debugPrint("Error loading audio: $e");
-    }
+    } catch (e) {}
   }
 
   @override
@@ -635,8 +639,9 @@ class _CassetteTapePlayerState extends State<CassetteTapePlayer>
       width: double.infinity,
       color: const Color(0xFFE8E5D9),
       child: SingleChildScrollView(
+        physics:
+            const NeverScrollableScrollPhysics(), // Allows main card to scroll
         padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
-        physics: const BouncingScrollPhysics(),
         child: Column(
           children: [
             Container(
@@ -729,20 +734,13 @@ class _CassetteTapePlayerState extends State<CassetteTapePlayer>
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                GestureDetector(
-                  onTap: _togglePlay,
-                  child: Icon(
-                    _isPlaying
-                        ? Icons.pause_circle_filled
-                        : Icons.play_circle_fill,
-                    color: const Color(0xFFD35400),
-                    size: 80,
-                  ),
-                ),
-              ],
+            GestureDetector(
+              onTap: _togglePlay,
+              child: Icon(
+                _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                color: const Color(0xFFD35400),
+                size: 80,
+              ),
             ),
           ],
         ),
@@ -752,7 +750,7 @@ class _CassetteTapePlayerState extends State<CassetteTapePlayer>
 }
 
 // ============================================================================
-// 🔹 3. THE REFACTORED DATA MODEL
+// 🔹 4. THE DATA MODEL
 // ============================================================================
 class Moment {
   final String id;
@@ -760,7 +758,11 @@ class Moment {
   final String avatarUrl;
   final DateTime timestamp;
   final MomentMedia media;
-  final String emotionEmoji;
+  final String caption;
+  final Map<SpotReactions, int> reactionCounts;
+  final int commentCount;
+
+  SpotReactions? userReaction;
 
   Moment({
     required this.id,
@@ -768,18 +770,28 @@ class Moment {
     required this.avatarUrl,
     required this.timestamp,
     required Map<String, dynamic> payload,
-    required this.emotionEmoji,
+    required this.reactionCounts,
+    this.caption = "",
+    this.commentCount = 0,
+    this.userReaction,
   }) : media = MomentMedia.fromJson(payload);
+
+  int get totalReactions =>
+      reactionCounts.values.fold(0, (sum, val) => sum + val);
+
+  List<SpotReactions> get top3Reactions {
+    var sortedEntries = reactionCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sortedEntries.take(3).map((e) => e.key).toList();
+  }
 }
 
 // ============================================================================
-// 🔹 4. THE SPOT DISPLAY SCREEN
+// 🔹 5. THE SPOT DISPLAY SCREEN (MAIN CAROUSEL)
 // ============================================================================
 class SpotDisplayScreen extends StatefulWidget {
   final String spotTitle;
-
   const SpotDisplayScreen({super.key, required this.spotTitle});
-
   @override
   State<SpotDisplayScreen> createState() => _SpotDisplayScreenState();
 }
@@ -792,14 +804,20 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
   bool _isDraggingTimeline = false;
   final double _nodeWidth = 80.0;
 
-  // --- EXPANDED DUMMY DATA WITH ALL TYPES ---
+  // --- EXPANDED DUMMY DATA ---
   final List<Moment> _moments = [
     Moment(
       id: '1',
-      authorName: 'David L.',
+      authorName: 'User_test42',
       avatarUrl: 'https://i.pravatar.cc/150?u=david',
-      timestamp: DateTime(2022, 5, 12),
-      emotionEmoji: '☕',
+      timestamp: DateTime(2025, 2, 12),
+      reactionCounts: {
+        SpotReactions.wholesome: 100000,
+        SpotReactions.funny: 40000,
+        SpotReactions.wow: 5000,
+      },
+      caption: "This view is insane at sunset!",
+      commentCount: 56,
       payload: {
         'type': 'photo',
         'url':
@@ -808,49 +826,72 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
     ),
     Moment(
       id: '2',
-      authorName: 'Maya T.',
+      authorName: 'Maya_T',
       avatarUrl: 'https://i.pravatar.cc/150?u=maya',
-      timestamp: DateTime(2023, 8, 22),
-      emotionEmoji: '🎙️',
+      timestamp: DateTime(2025, 3, 22),
+      reactionCounts: {SpotReactions.insightful: 500},
+      caption: "Recorded the rain hitting the tin roof today.",
+      commentCount: 4,
       payload: {
         'type': 'audio',
         'title': 'Morning Rain Sounds',
         'duration': '1:45',
         'url': 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-      }, // 🔹 CASSETTE TAPE!
+      },
     ),
     Moment(
       id: '3',
-      authorName: 'Alex M.',
+      authorName: 'Alex_M',
       avatarUrl: 'https://i.pravatar.cc/150?u=alex',
-      timestamp: DateTime(2024, 1, 15),
-      emotionEmoji: '🎶',
+      timestamp: DateTime(2025, 6, 15),
+      reactionCounts: {SpotReactions.wow: 200, SpotReactions.support: 50},
+      caption: "Current mood.",
+      commentCount: 12,
       payload: {
-        'type': 'music',
-        'song_title': 'Midnight City',
-        'artist': 'M83',
+        // 🔹 ADDED ODESLI LINKS BACK IN!
+        'type': 'music', 'song_title': 'Midnight City', 'artist': 'M83',
         'album_art':
             'https://images.unsplash.com/photo-1619983081563-430f63602796?w=800&q=80',
-        // 🔹 REAL WORKING AUDIO LINK: Replaced the dummy URL with a live MP3 stream
         'preview_url':
             'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
         'platform_links': {
-          'Spotify': 'https://open.spotify.com/track/1234',
-          'Apple Music': 'https://music.apple.com/us/album/1234',
-          'YouTube': 'https://youtube.com/watch?v=1234',
+          'Spotify': 'https://open.spotify.com/track/123',
+          'Apple Music': 'https://music.apple.com/123',
         },
       },
     ),
     Moment(
       id: '4',
-      authorName: 'Sarah J.',
+      authorName: 'Sarah_J',
       avatarUrl: 'https://i.pravatar.cc/150?u=sarah',
       timestamp: DateTime(2025, 10, 15),
-      emotionEmoji: '🔥',
+      reactionCounts: {
+        SpotReactions.funny: 145000,
+        SpotReactions.wholesome: 2300,
+        SpotReactions.wow: 150,
+      },
+      commentCount: 400,
       payload: {
         'type': 'poll',
         'question': 'Best time to visit this spot?',
         'options': ['Sunrise', 'Sunset', 'Midnight'],
+      },
+    ),
+    Moment(
+      id: '5',
+      authorName: 'Sarah_J',
+      avatarUrl: 'https://i.pravatar.cc/150?u=sarah',
+      timestamp: DateTime(2024, 10, 15),
+      reactionCounts: {
+        SpotReactions.funny: 145,
+        SpotReactions.wholesome: 2300,
+        SpotReactions.wow: 150,
+      },
+      commentCount: 8, // Intentionally blank caption for Text moments
+      payload: {
+        'type': 'text',
+        'text':
+            'This is the most incredible hidden spot in the city. I love coming here to read and grab a coffee!',
       },
     ),
   ];
@@ -861,7 +902,7 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
     _currentIndex = _moments.length - 1;
     _stageController = PageController(
       initialPage: _currentIndex,
-      viewportFraction: 0.80,
+      viewportFraction: 0.85,
     );
     _timelineController = ScrollController(
       initialScrollOffset: _currentIndex * _nodeWidth,
@@ -880,7 +921,6 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
       HapticFeedback.selectionClick();
       setState(() => _currentIndex = index);
     }
-
     if (!_isDraggingTimeline && _timelineController.hasClients) {
       _timelineController.animateTo(
         index * _nodeWidth,
@@ -890,9 +930,22 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
     }
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-  }
+  String _formatDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  String _getMonthName(int month) => [
+    'Jan',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ][month - 1];
 
   void _openMomentFullScreen(Moment moment) {
     HapticFeedback.lightImpact();
@@ -912,8 +965,14 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 🔹 1. PREVENT 296px VERTICAL OVERFLOW: Dynamically calculate exact PageView height
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double cardWidth = screenWidth * 0.85;
+    final double safePageViewHeight =
+        cardWidth + 140; // 1:1 Aspect + Date Text + Margins
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFBFBF2),
+      backgroundColor: const Color(0xFFF3F2EB),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -921,9 +980,9 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
             children: [
               _buildHeader(),
               const SizedBox(height: 16),
-
               SizedBox(
-                height: 420,
+                height:
+                    safePageViewHeight, // Safely handles wide phones and tablets!
                 child: PageView.builder(
                   controller: _stageController,
                   physics: const BouncingScrollPhysics(),
@@ -934,10 +993,8 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
                   },
                 ),
               ),
-
-              const SizedBox(height: 24),
               _buildTimeScrubber(),
-              const SizedBox(height: 48),
+              const SizedBox(height: 35),
               _buildCuratedSections(),
               const SizedBox(height: 60),
             ],
@@ -949,65 +1006,74 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Stack(
+            alignment: Alignment.center,
             children: [
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: const Icon(
-                  Icons.arrow_back_ios_new,
-                  color: Colors.black87,
-                  size: 24,
+              Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new,
+                    color: Colors.black87,
+                    size: 28,
+                  ),
                 ),
               ),
               const Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.public, color: Colors.black54, size: 16),
-                  SizedBox(width: 4),
+                  Icon(Icons.public, color: Colors.black87, size: 18),
+                  SizedBox(width: 6),
                   Text(
                     "Public",
                     style: TextStyle(
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 24),
             ],
           ),
           const SizedBox(height: 24),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: Text(
-                  widget.spotTitle,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.black87,
-                    letterSpacing: -0.5,
+                child: Container(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Colors.black54, width: 2),
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  child: Text(
+                    widget.spotTitle,
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                      letterSpacing: -0.5,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
+              const SizedBox(width: 16),
               const Icon(
                 Icons.bookmark_border,
                 color: Colors.black87,
-                size: 32,
+                size: 40,
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Container(height: 2, width: double.infinity, color: Colors.black87),
         ],
       ),
     );
@@ -1024,301 +1090,236 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
         } else {
           pageOffset = (_currentIndex - index).toDouble();
         }
-
         double scale = (1 - (pageOffset.abs() * 0.15)).clamp(0.85, 1.0);
         double opacity = (1 - (pageOffset.abs() * 0.5)).clamp(0.5, 1.0);
-
         return Transform.scale(
           scale: scale,
           child: Opacity(opacity: opacity, child: child),
         );
       },
-      child: GestureDetector(
-        onTap: () => _openMomentFullScreen(moment),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          alignment: Alignment.center,
-          child: AspectRatio(
-            aspectRatio: 0.75,
-            child: Hero(
-              tag: 'moment_card_${moment.id}',
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              moment.media.buildPreview(context),
-                              Positioned(
-                                top: 12,
-                                right: 12,
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black12,
-                                        blurRadius: 4,
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Icon(
-                                    Icons.diamond_outlined,
-                                    color: Colors.blueAccent,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _formatDate(moment.timestamp),
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () => _openMomentFullScreen(moment),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              child: Hero(
+                tag: 'moment_card_${moment.id}',
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundImage: NetworkImage(moment.avatarUrl),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              moment.authorName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: Colors.black87,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AspectRatio(
+                          aspectRatio: 1.0,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [moment.media.buildPreview(context)],
                             ),
                           ),
-                          Text(
-                            moment.emotionEmoji,
-                            style: const TextStyle(fontSize: 22),
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundImage: NetworkImage(moment.avatarUrl),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                "@${moment.authorName}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.black87,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            OverlappingReactionStack(
+                              reactions: moment.top3Reactions,
+                              totalReactions: moment.totalReactions,
+                              scale: 1,
+                              counterTextColor: Colors.black87,
+                              outlineColor: Colors.white,
+                            ), // Slightly shrunk scale
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildTimeScrubber() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(width: 30, height: 2, color: Colors.grey[400]),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12.0),
-              child: Text(
-                "Scroll Through Time",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black54,
-                  fontSize: 16,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-            Container(width: 30, height: 2, color: Colors.grey[400]),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 100,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final double sidePadding =
-                  (constraints.maxWidth / 2) - (_nodeWidth / 2);
-
-              return Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  NotificationListener<ScrollNotification>(
-                    onNotification: (notification) {
-                      if (notification is ScrollStartNotification) {
-                        _isDraggingTimeline = true;
-                      } else if (notification is ScrollUpdateNotification) {
-                        if (_isDraggingTimeline) {
-                          int newIndex =
-                              (_timelineController.offset / _nodeWidth).round();
-                          newIndex = newIndex.clamp(0, _moments.length - 1);
-                          if (newIndex != _currentIndex) {
-                            HapticFeedback.selectionClick();
-                            setState(() => _currentIndex = newIndex);
-                            _stageController.jumpToPage(newIndex);
-                          }
-                        }
-                      } else if (notification is ScrollEndNotification) {
-                        _isDraggingTimeline = false;
-                        Future.microtask(() {
-                          if (_timelineController.hasClients) {
-                            _timelineController.animateTo(
-                              _currentIndex * _nodeWidth,
-                              duration: const Duration(milliseconds: 200),
-                              curve: Curves.easeOutCubic,
-                            );
-                          }
-                        });
+    return SizedBox(
+      height: 100,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final double sidePadding =
+              (constraints.maxWidth / 2) - (_nodeWidth / 2);
+          return Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (notification is ScrollStartNotification) {
+                    _isDraggingTimeline = true;
+                  } else if (notification is ScrollUpdateNotification) {
+                    if (_isDraggingTimeline) {
+                      int newIndex = (_timelineController.offset / _nodeWidth)
+                          .round()
+                          .clamp(0, _moments.length - 1);
+                      if (newIndex != _currentIndex) {
+                        HapticFeedback.selectionClick();
+                        setState(() => _currentIndex = newIndex);
+                        _stageController.jumpToPage(newIndex);
                       }
-                      return true;
-                    },
-                    child: ListView.builder(
-                      controller: _timelineController,
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.symmetric(horizontal: sidePadding),
-                      itemCount: _moments.length,
-                      itemBuilder: (context, index) {
-                        return SizedBox(
-                          width: _nodeWidth,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Container(
-                                height: 2,
-                                color: Colors.grey[400],
-                                margin: EdgeInsets.only(
-                                  left: index == 0 ? _nodeWidth / 2 : 0,
-                                  right: index == _moments.length - 1
-                                      ? _nodeWidth / 2
-                                      : 0,
-                                ),
-                              ),
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[500],
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: const Color(0xFFFBFBF2),
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                              if (index == 0)
-                                Positioned(
-                                  top: 10,
-                                  child: Text(
-                                    _moments.first.timestamp.year.toString(),
-                                    style: const TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              if (index == _moments.length - 1)
-                                const Positioned(
-                                  top: 10,
-                                  child: Text(
-                                    "Now",
-                                    style: TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
+                    }
+                  } else if (notification is ScrollEndNotification) {
+                    _isDraggingTimeline = false;
+                    Future.microtask(() {
+                      if (_timelineController.hasClients) {
+                        _timelineController.animateTo(
+                          _currentIndex * _nodeWidth,
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
                         );
-                      },
-                    ),
-                  ),
-                  IgnorePointer(
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF91C5F2).withOpacity(0.4),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 18,
-                          height: 18,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF91C5F2),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    child: IgnorePointer(
+                      }
+                    });
+                  }
+                  return true;
+                },
+                child: ListView.builder(
+                  controller: _timelineController,
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.symmetric(horizontal: sidePadding),
+                  itemCount: _moments.length,
+                  itemBuilder: (context, index) {
+                    Moment m = _moments[index];
+                    bool isYear = m.timestamp.month == 1 || index == 0;
+                    bool isLast = index == _moments.length - 1;
+                    String topText = isYear ? m.timestamp.year.toString() : "";
+                    if (isLast) topText = "Now";
+                    String bottomText = !isYear && !isLast
+                        ? _getMonthName(m.timestamp.month)
+                        : "";
+                    return SizedBox(
+                      width: _nodeWidth,
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            _formatDate(_moments[_currentIndex].timestamp),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: Colors.black87,
-                              fontSize: 15,
-                              letterSpacing: 0.5,
+                          SizedBox(
+                            height: 20,
+                            child: Text(
+                              topText,
+                              style: const TextStyle(
+                                color: Colors.black54,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
-                          Container(
-                            margin: const EdgeInsets.only(top: 2, bottom: 4),
-                            width: 80,
-                            height: 1.5,
-                            color: Colors.black87,
+                          SizedBox(
+                            height: 40,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  height: 2,
+                                  color: Colors.grey[500],
+                                  margin: EdgeInsets.only(
+                                    left: index == 0 ? _nodeWidth / 2 : 0,
+                                    right: isLast ? _nodeWidth / 2 : 0,
+                                  ),
+                                ),
+                                Container(
+                                  width: isYear || isLast ? 20.0 : 12.0,
+                                  height: isYear || isLast ? 20.0 : 12.0,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[600],
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const Icon(
-                            Icons.keyboard_arrow_down,
-                            size: 18,
-                            color: Colors.black87,
+                          SizedBox(
+                            height: 20,
+                            child: Text(
+                              bottomText,
+                              style: const TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
                           ),
                         ],
                       ),
+                    );
+                  },
+                ),
+              ),
+              IgnorePointer(
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withOpacity(0.3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: const BoxDecoration(
+                        color: Colors.blueAccent,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -1327,11 +1328,11 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20.0),
+          padding: EdgeInsets.symmetric(horizontal: 24.0),
           child: Text(
-            "The Soundtrack",
+            "Spot Soundtrack",
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 24,
               fontWeight: FontWeight.w900,
               color: Colors.black87,
             ),
@@ -1339,16 +1340,16 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 120,
+          height: 140,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: 4,
             itemBuilder: (context, index) {
               return Container(
-                width: 120,
-                margin: const EdgeInsets.symmetric(horizontal: 8),
+                width: 140,
+                margin: const EdgeInsets.only(right: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   image: const DecorationImage(
@@ -1384,7 +1385,7 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -1392,75 +1393,7 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
             },
           ),
         ),
-
-        const SizedBox(height: 40),
-
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20.0),
-          child: Text(
-            "The Vibe Check",
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: Colors.black87,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: Row(
-            children: [
-              _buildVibePill("☕ Cozy", "45%"),
-              const SizedBox(width: 12),
-              _buildVibePill("🎶 Loud", "30%"),
-              const SizedBox(width: 12),
-              _buildVibePill("🌧️ Chill", "25%"),
-            ],
-          ),
-        ),
       ],
-    );
-  }
-
-  Widget _buildVibePill(String emojiText, String percentage) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(color: Colors.grey.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              emojiText,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              percentage,
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 18,
-                color: Colors.blueAccent[400],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -1468,22 +1401,370 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
 // ============================================================================
 // 🔹 THE FULL SCREEN VIEW
 // ============================================================================
-class MomentFullScreenView extends StatelessWidget {
+class MomentFullScreenView extends StatefulWidget {
   final Moment moment;
-
   const MomentFullScreenView({super.key, required this.moment});
+  @override
+  State<MomentFullScreenView> createState() => _MomentFullScreenViewState();
+}
+
+class _MomentFullScreenViewState extends State<MomentFullScreenView> {
+  // 🔹 The Centralized Data Updater
+  // This safely handles swapping, adding, and removing reactions
+  void _handleReactionSelect(
+    SpotReactions tappedReaction,
+    VoidCallback? updateListSheet,
+  ) {
+    setState(() {
+      SpotReactions? oldReaction = widget.moment.userReaction;
+
+      if (oldReaction == tappedReaction) {
+        // SCENARIO 1: Tapping the already selected reaction (Remove it)
+        // 🔹 FIX: We use tappedReaction here since we know it equals oldReaction and is non-null!
+        widget.moment.reactionCounts[tappedReaction] =
+            (widget.moment.reactionCounts[tappedReaction] ?? 1) - 1;
+
+        if (widget.moment.reactionCounts[tappedReaction] == 0) {
+          widget.moment.reactionCounts.remove(tappedReaction);
+        }
+
+        widget.moment.userReaction = null;
+      } else {
+        // SCENARIO 2: Tapping a new reaction (Swap or Add)
+        if (oldReaction != null) {
+          // Remove the old one first
+          // 🔹 FIX: Added the '!' operator to tell Dart it is definitely not null
+          widget.moment.reactionCounts[oldReaction!] =
+              (widget.moment.reactionCounts[oldReaction] ?? 1) - 1;
+
+          if (widget.moment.reactionCounts[oldReaction] == 0) {
+            widget.moment.reactionCounts.remove(oldReaction);
+          }
+        }
+
+        // Add the new one
+        widget.moment.userReaction = tappedReaction;
+        widget.moment.reactionCounts[tappedReaction] =
+            (widget.moment.reactionCounts[tappedReaction] ?? 0) + 1;
+      }
+    });
+
+    // If the list bottom sheet is open, this forces it to visually update!
+    updateListSheet?.call();
+  }
+
+  void _showReactionsList() {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (BuildContext sheetContext) {
+        // 🔹 StatefulBuilder lets us update the bottom sheet instantly without closing it
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setSheetState) {
+            // Sort the list fresh on every rebuild
+            var sortedEntries = widget.moment.reactionCounts.entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value));
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16.0,
+                  horizontal: 16.0,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 🔹 THE DRAG HANDLE
+                    Container(
+                      width: 40,
+                      height: 5,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2.5),
+                      ),
+                    ),
+                    Text(
+                      "${formatNumberWithCommas(widget.moment.totalReactions)} Reactions",
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+
+                    Expanded(
+                      child: ListView.builder(
+                        // 🔹 Add 1 to the count to make room for our special top row
+                        itemCount: sortedEntries.length + 1,
+                        itemBuilder: (context, index) {
+                          // ==========================================
+                          // THE SPECIAL TOP ROW (Index 0)
+                          // ==========================================
+                          if (index == 0) {
+                            if (widget.moment.userReaction != null) {
+                              // STATE 1: User HAS reacted -> Show Green "Remove" Pill
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    // 🔹 Opens selector AND passes the setState function so the list updates live!
+                                    _showReactionSelector(
+                                      updateListSheet: () =>
+                                          setSheetState(() {}),
+                                    );
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.only(
+                                      bottom: 16,
+                                      top: 8,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade50,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.green.shade300,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Image.asset(
+                                          widget.moment.userReaction!.assetPath,
+                                          width: 28,
+                                          height: 28,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Text(
+                                          "Tap to change",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: Colors.green,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            } else {
+                              // STATE 2: User has NOT reacted -> Show "Add Reaction" Button
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    // 🔹 Opens selector AND passes the setState function
+                                    _showReactionSelector(
+                                      updateListSheet: () =>
+                                          setSheetState(() {}),
+                                    );
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.only(
+                                      bottom: 24,
+                                      top: 8,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 28,
+                                          height: 28,
+                                          decoration: const BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.add_reaction_outlined,
+                                            color: Colors.black54,
+                                            size: 30,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Text(
+                                          "Add a reaction",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+
+                          // ==========================================
+                          // THE STANDARD LIST (Index 1+)
+                          // ==========================================
+                          // We subtract 1 from the index because the 0th item is our special row
+                          final entry = sortedEntries[index - 1];
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                            ),
+                            leading: Image.asset(
+                              entry.key.assetPath,
+                              width: 32,
+                              height: 32,
+                            ),
+                            title: Text(
+                              entry.key.name.toUpperCase(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            trailing: Text(
+                              formatNumberWithCommas(entry.value),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 🔹 Optionally accepts a callback so the list sheet can rebuild if it's open behind this one
+  void _showReactionSelector({VoidCallback? updateListSheet}) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (context) {
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 80, left: 16, right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(40),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                // 🔹 Passing the Enums directly
+                _buildAnimatedEmojiBtn(SpotReactions.funny, updateListSheet),
+                _buildAnimatedEmojiBtn(SpotReactions.wow, updateListSheet),
+                _buildAnimatedEmojiBtn(
+                  SpotReactions.wholesome,
+                  updateListSheet,
+                ),
+                _buildAnimatedEmojiBtn(
+                  SpotReactions.insightful,
+                  updateListSheet,
+                ),
+                _buildAnimatedEmojiBtn(SpotReactions.sad, updateListSheet),
+                _buildAnimatedEmojiBtn(SpotReactions.meh, updateListSheet),
+                _buildAnimatedEmojiBtn(SpotReactions.support, updateListSheet),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnimatedEmojiBtn(
+    SpotReactions reaction,
+    VoidCallback? updateListSheet,
+  ) {
+    bool isSelected = widget.moment.userReaction == reaction;
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.heavyImpact();
+        Navigator.pop(context); // Close the selector
+        _handleReactionSelect(
+          reaction,
+          updateListSheet,
+        ); // Trigger the swap logic
+      },
+      child: Container(
+        padding: const EdgeInsets.all(
+          5,
+        ), // Gives the emoji room inside the grey circle
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          // 🔹 Shows the Grey Selection Circle
+          color: isSelected
+              ? Colors.grey.withValues(alpha: 0.4)
+              : Colors.transparent,
+        ),
+        child: Image.asset(
+          reaction.animatedAssetPath,
+          width: 35,
+          height: 35,
+          errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.emoji_emotions, size: 40, color: Colors.amber),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    const Color buttonsBackgroundColor = Color(0xFF545454);
+    // const Color buttonsBackgroundColor = Color(0xFF3D3D3D);
+
     return Scaffold(
-      backgroundColor: Colors.black.withOpacity(0.95),
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
+            // 1. Fixed Top Header
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16.0,
-                vertical: 8.0,
+                vertical: 12.0,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1493,7 +1774,7 @@ class MomentFullScreenView extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: const BoxDecoration(
-                        color: Colors.white24,
+                        color: buttonsBackgroundColor,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1504,106 +1785,294 @@ class MomentFullScreenView extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    moment.emotionEmoji,
-                    style: const TextStyle(fontSize: 28),
+                    "${widget.moment.timestamp.day.toString().padLeft(2, '0')}/${widget.moment.timestamp.month.toString().padLeft(2, '0')}/${widget.moment.timestamp.year}",
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
                   ),
+                  const SizedBox(width: 40),
                 ],
               ),
             ),
+
+            // 2. 🔹 FIXED: The Constant Size Scroll Container
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: Hero(
-                  tag: 'moment_card_${moment.id}',
+                  tag: 'moment_card_${widget.moment.id}',
                   child: Material(
                     color: Colors.transparent,
                     child: Container(
+                      clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                      clipBehavior: Clip.hardEdge,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(child: moment.media.buildExpanded(context)),
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            color: Colors.white,
-                            child: Row(
+                      // The container acts as the physical window, the content scrolls fluidly inside
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          // All media blocks are forced to a perfect 3:4 vertical portrait
+                          final double mediaHeight =
+                              constraints.maxWidth * (4 / 3);
+
+                          return SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            child: Stack(
+                              clipBehavior: Clip.none,
                               children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundImage: NetworkImage(
-                                    moment.avatarUrl,
-                                  ),
+                                Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    // A. The Media Block
+                                    SizedBox(
+                                      height: mediaHeight,
+                                      child: widget.moment.media.buildExpanded(
+                                        context,
+                                      ),
+                                    ),
+
+                                    // B. The White Context Area
+                                    Container(
+                                      color: Colors.white,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        20,
+                                        28,
+                                        20,
+                                        20,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const SizedBox(
+                                                width: 56,
+                                              ), // Leaves room for avatar
+                                              Expanded(
+                                                child: Text(
+                                                  "@${widget.moment.authorName}",
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                    color: Colors.black87,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 6,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(
+                                                    color: Colors.grey.shade300,
+                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons
+                                                          .photo_library_outlined,
+                                                      size: 16,
+                                                      color: Colors.black54,
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      "Tel Aviv Moments",
+                                                      style: TextStyle(
+                                                        color: Colors.blue[800],
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+
+                                          // Conditionally render the caption only if it exists
+                                          if (widget
+                                              .moment
+                                              .caption
+                                              .isNotEmpty) ...[
+                                            const SizedBox(height: 16),
+                                            Text(
+                                              widget.moment.caption,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                color: Colors.black87,
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        moment.authorName,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: Colors.black87,
-                                        ),
+
+                                // C. Overlapping Avatar (Seamed dynamically!)
+                                Positioned(
+                                  left: 20,
+                                  top: mediaHeight - 24,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 22,
+                                      backgroundImage: NetworkImage(
+                                        widget.moment.avatarUrl,
                                       ),
-                                      Text(
-                                        "Added a new memory here",
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                   ),
                 ),
               ),
             ),
+
+            // 3. 🔹 FIXED 20px HORIZONTAL OVERFLOW: Smaller paddings on bottom bar
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               child: Row(
                 children: [
-                  Expanded(
-                    child: Container(
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          "Add a comment...",
-                          style: TextStyle(color: Colors.white54, fontSize: 15),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: buttonsBackgroundColor,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.chat_bubble_outline,
+                          color: Colors.white,
+                          size: 20,
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Text(
+                          widget.moment.commentCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  const Icon(
-                    Icons.favorite_border,
-                    color: Colors.white,
-                    size: 28,
+
+                  const Spacer(), // Safely takes remaining width
+                  // The Split Reaction Pill (No outlines here!)
+                  Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: buttonsBackgroundColor,
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        InkWell(
+                          onTap: _showReactionsList,
+                          borderRadius: const BorderRadius.horizontal(
+                            left: Radius.circular(22),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 10, right: 10),
+                            child: OverlappingReactionStack(
+                              reactions: widget.moment.top3Reactions,
+                              totalReactions: widget.moment.totalReactions,
+                              scale:
+                                  0.9, // Scaled down to guarantee no overflow
+                              outlineColor: buttonsBackgroundColor,
+                              counterTextColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 2,
+                          height: 30,
+                          color: Color(0xFF404040),
+                        ),
+                        InkWell(
+                          // 🔹 Opens the selector directly. No need for updateListSheet here since list is closed.
+                          onTap: () => _showReactionSelector(),
+                          borderRadius: const BorderRadius.horizontal(
+                            right: Radius.circular(22),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 6, right: 10),
+                            // 🔹 THE DYNAMIC ICON: Shows selected image OR the default icon!
+                            child: widget.moment.userReaction != null
+                                ? Image.asset(
+                                    widget.moment.userReaction!.assetPath,
+                                    width: 22,
+                                    height: 22,
+                                  )
+                                : const Icon(
+                                    Icons.add_reaction_outlined,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 16),
-                  const Icon(
-                    Icons.share_outlined,
-                    color: Colors.white,
-                    size: 28,
+
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: buttonsBackgroundColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.bookmark_border,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: buttonsBackgroundColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.share_outlined,
+                      color: Colors.white,
+                      size: 22,
+                    ),
                   ),
                 ],
               ),

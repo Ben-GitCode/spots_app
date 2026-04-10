@@ -15,6 +15,76 @@ enum SpotReactions {
   empty,
 }
 
+// // 🔹 THE UPGRADE: This makes the emoji accessible anywhere you use the enum!
+// extension SpotReactionsExtension on SpotReactions {
+//   String get emoji {
+//     switch (this) {
+//       case SpotReactions.funny:
+//         return "\u{1F602}";
+//       case SpotReactions.wow:
+//         return "\u{1F62E}";
+//       case SpotReactions.sad:
+//         return "\u{1F622}";
+//       case SpotReactions.insightful:
+//         return "\u{1F4A1}";
+//       case SpotReactions.support:
+//         // return "\u{1F4AA}";
+//         return "\u{1F525}";
+//       case SpotReactions.meh:
+//         return "\u{1F615}";
+//       case SpotReactions.wholesome:
+//         return "\u{1F970}";
+//       case SpotReactions.empty:
+//         return "\u{2754}";
+//     }
+//   }
+// }
+
+extension SpotReactionsExtension on SpotReactions {
+  String get assetPath {
+    switch (this) {
+      case SpotReactions.funny:
+        return "assets/emojis/emoji_u1f602.png";
+      case SpotReactions.wow:
+        return "assets/emojis/emoji_u1f62f.png";
+      case SpotReactions.sad:
+        return "assets/emojis/emoji_u1f622.png";
+      case SpotReactions.insightful:
+        return "assets/emojis/emoji_u1f4a1.png";
+      case SpotReactions.support:
+        return "assets/emojis/emoji_u1f525.png";
+      case SpotReactions.meh:
+        return "assets/emojis/emoji_u1f615.png";
+      case SpotReactions.wholesome:
+        return "assets/emojis/emoji_u1f970.png";
+      case SpotReactions.empty:
+        return "assets/emojis/emoji_u2754.png";
+    }
+  }
+
+  // 🔹 NEW: The Animated WebPs (Used ONLY in the bottom sheet selector)
+  String get animatedAssetPath {
+    switch (this) {
+      case SpotReactions.funny:
+        return "assets/animated/funny.webp";
+      case SpotReactions.wow:
+        return "assets/animated/wow.webp";
+      case SpotReactions.sad:
+        return "assets/animated/sad.webp";
+      case SpotReactions.insightful:
+        return "assets/animated/insightful.webp";
+      case SpotReactions.support:
+        return "assets/animated/support.webp";
+      case SpotReactions.meh:
+        return "assets/animated/meh.webp";
+      case SpotReactions.wholesome:
+        return "assets/animated/wholesome.webp";
+      case SpotReactions.empty:
+        return "assets/animated/empty.webp";
+    }
+  }
+}
+
 // 2. THE CLASS
 class Spot {
   final String id; // Unique ID to track selection
@@ -71,28 +141,29 @@ class Spot {
   }
 
   // 4. LOGIC: Get emoji based on Reaction
-  String getEmojiForReaction(SpotReactions r) {
-    switch (r) {
-      case SpotReactions.funny:
-        return "\u{1F602}"; // Laughing Emoji
-      case SpotReactions.wow:
-        return "\u{1F62E}"; // Shocked Emoji
-      case SpotReactions.sad:
-        return "\u{1F622}"; // Emoji with tear
-      case SpotReactions.insightful:
-        return "\u{1F4A1}"; // Lightbulb
-      case SpotReactions.support:
-        return "\u{1F4AA}"; // Bicep
-      case SpotReactions.meh:
-        return "\u{1F615}"; // Meh Emoji
-      case SpotReactions.wholesome:
-        return "\u{1F60D}"; // Heart Eyes
-      case SpotReactions.empty:
-        return "\u{2754}"; // Question Mark
-    }
-  }
+  // String getEmojiForReaction(SpotReactions r) {
+  //   switch (r) {
+  //     case SpotReactions.funny:
+  //       return "\u{1F602}"; // Laughing Emoji
+  //     case SpotReactions.wow:
+  //       return "\u{1F62E}"; // Shocked Emoji
+  //     case SpotReactions.sad:
+  //       return "\u{1F622}"; // Emoji with tear
+  //     case SpotReactions.insightful:
+  //       return "\u{1F4A1}"; // Lightbulb
+  //     case SpotReactions.support:
+  //       return "\u{1F4AA}"; // Bicep
+  //     case SpotReactions.meh:
+  //       return "\u{1F615}"; // Meh Emoji
+  //     case SpotReactions.wholesome:
+  //       return "\u{1F60D}"; // Heart Eyes
+  //     case SpotReactions.empty:
+  //       return "\u{2754}"; // Question Mark
+  //   }
+  // }
 
-  String get topEmoji => getEmojiForReaction(topReaction);
+  // 4. LOGIC: Get top reaction asset path
+  String get topReactionAsset => topReaction.assetPath;
 
   factory Spot.fromJson(Map<String, dynamic> json) {
     // 1. Parse Location (Supabase usually returns GeoJSON or raw lat/lng columns)
