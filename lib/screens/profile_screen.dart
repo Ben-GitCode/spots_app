@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'achievements_screen.dart';
+import 'package:spots_app/utils/user_data.dart';
+import 'package:provider/provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   final int worldPercentage;
@@ -23,6 +25,9 @@ class ProfileScreen extends StatelessWidget {
   // Basic structure of the profile screen with header, stats, collections, and photo grid
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final user = userProvider.currentUser;
+    
   return Stack(
     clipBehavior: Clip.none,
     children: [
@@ -47,7 +52,7 @@ class ProfileScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildNameHeader(),
+                          _buildNameHeader(user?.username),
                           const SizedBox(height: 15),
                           _buildStatsAndPassport(context),
                           const SizedBox(height: 20),
@@ -156,8 +161,10 @@ class ProfileScreen extends StatelessWidget {
               shape: BoxShape.circle,
               border: Border.all(color: Colors.black87, width: 3),
               image: DecorationImage(
-                image: NetworkImage("https://th.bing.com/th/id/OIP.YOCYcAmmqZOMDcP9mc2M6wHaHa?w=194&h=194&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3"),
-                fit: BoxFit.cover,
+                image: NetworkImage(
+                  // Use the URL from your UserData class, with a fallback if it's null
+                  user!.profilePictureUrl,
+                ),
               ),
               boxShadow: [
                 BoxShadow(
@@ -175,7 +182,7 @@ class ProfileScreen extends StatelessWidget {
 }
 
   // The header with the username, aligned to the right of the profile photo
-  Widget _buildNameHeader() {
+  Widget _buildNameHeader(String? usernameTest) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -185,7 +192,7 @@ class ProfileScreen extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(top: 5, bottom: 10),
               child: Text(
-                username,
+                usernameTest!,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

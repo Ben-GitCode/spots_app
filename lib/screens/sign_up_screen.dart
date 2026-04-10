@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'profile_setup_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:spots_app/utils/user_data.dart';
 
 class CreateUserScreen extends StatefulWidget {
   const CreateUserScreen({super.key});
@@ -25,33 +28,54 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
     try {
       final supabase = Supabase.instance.client;
 
+      // 1. Create the account (This logs them in automatically)
       final response = await supabase.auth.signUp(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
         data: {
-          'name': nameController.text.trim(), // saved in metadata
+          'name': nameController.text.trim(),
         },
       );
 
-      if (response.user != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User signed up successfully!')),
+      final user = response.user;
+
+      if (user != null) {
+        if (!mounted) return;
+
+        // 2. Initialize the UserData object with the info we just typed
+        // We use a temporary default image since they haven't reached the upload screen yet
+        final newUser = UserData(
+          userID: user.id,
+          username: nameController.text.trim(),
+          profilePictureUrl: "https://nyprkwgliwnyktcqsfsf.supabase.co/storage/v1/object/public/profile_pictures/clker-free-vector-images-profile-42914.svg", 
+          dataJoined: DateTime.now(),
+          worldPercentage: 0,
+          contributionsCount: 0,
+          userMoments: [],
+          userCollections: [],
+          userStamps: [],
         );
 
-        nameController.clear();
-        emailController.clear();
-        passwordController.clear();
+        // 3. Store this in the Provider immediately
+        Provider.of<UserProvider>(context, listen: false).setUser(newUser);
+
+        // 4. Navigate to profile setup
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
+        );
       } else {
         throw 'Signup failed';
       }
-
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
-
-    setState(() => isLoading = false);
   }
 
   @override
