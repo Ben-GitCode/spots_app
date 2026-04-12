@@ -280,7 +280,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-  
+    
     return Scaffold(
       body: FutureBuilder<Directory>(
         future: _cacheDir,

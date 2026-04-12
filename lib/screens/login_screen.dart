@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'sign_up_screen.dart';
 import 'map_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:spots_app/providers/user_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -32,6 +34,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (response.user != null) {
+        // B. NEW: Refresh the provider with the profile data
+        // We use listen: false because we are in a function, not a build method
+        await Provider.of<UserProvider>(context, listen: false).refreshUser();
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Logged in successfully!')),
         );
