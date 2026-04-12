@@ -7,6 +7,7 @@ import 'screens/login_screen.dart';
 import 'utils/user_data.dart';
 import 'package:provider/provider.dart';
 import 'providers/user_provider.dart';
+import 'providers/auth_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,7 +39,7 @@ class SpotsApp extends StatelessWidget {
       title: 'Spots',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const LoginScreen(),
+      home: const AuthGate(),
     );
   }
 }

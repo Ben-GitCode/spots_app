@@ -11,6 +11,20 @@ class UserProvider extends ChangeNotifier {
 
   final _supabase = Supabase.instance.client;
 
+  // Constructor runs immediately when the Provider is created
+  UserProvider() {
+    _initUser();
+  }
+
+  Future<void> _initUser() async {
+    final session = _supabase.auth.currentSession;
+    
+    // If a session already exists (the user didn't log out last time)
+    if (session != null) {
+      await refreshUser();
+    }
+  }
+  
   // This is the "Magic" function that fixes your null error
   Future<void> refreshUser() async {
     final user = _supabase.auth.currentUser;
@@ -22,12 +36,12 @@ class UserProvider extends ChangeNotifier {
     try {
       // Fetch profile data from your Supabase 'profiles' table
       final data = await _supabase
-          .from('profiles')
+          .from('users')
           .select()
           .eq('id', user.id)
           .single();
 
-      //_currentUser = UserData.fromJson(data);
+      _currentUser = UserData.fromJson(data);
     } catch (e) {
       debugPrint("Error refreshing user: $e");
     } finally {
