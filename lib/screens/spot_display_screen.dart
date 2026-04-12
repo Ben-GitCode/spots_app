@@ -7,6 +7,7 @@ import 'package:spots_app/utils/models.dart';
 import 'package:spots_app/components/overlapping_reaction_stack.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'dart:ui';
 
 // Helper to format large numbers (e.g., 145000 -> 145K)
 // String formatReactionsCount(int count) {
@@ -389,6 +390,9 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
             Stack(
               alignment: Alignment.center,
               children: [
+                // ==========================================
+                // 1. THE SPINNING BLACK VINYL & GROOVES
+                // ==========================================
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (_, child) => Transform.rotate(
@@ -429,22 +433,84 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
                             border: Border.all(color: Colors.white10, width: 1),
                           ),
                         ),
-                        ClipOval(
-                          child: SizedBox(
-                            width: 90,
-                            height: 90,
-                            child: widget.albumArtUrl.isNotEmpty
-                                ? Image.network(
-                                    widget.albumArtUrl,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Container(color: Colors.redAccent),
-                          ),
-                        ),
                       ],
                     ),
                   ),
                 ),
+
+                // ==========================================
+                // 2. 🔹 THE STATIC LIGHT REFLECTION (THE BOWTIE FIX)
+                // ==========================================
+                RepaintBoundary(
+                  child: IgnorePointer(
+                    child: ClipOval(
+                      // 🔹 Prevents the blur from leaking outside the record
+                      child: ImageFiltered(
+                        // 🔹 The Magic Fix: Blurs the harsh GPU polygons into a smooth photographic reflection
+                        imageFilter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                        child: Container(
+                          width: 220,
+                          height: 220,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: SweepGradient(
+                              transform: const GradientRotation(-math.pi / 4),
+                              colors: [
+                                Colors.white.withOpacity(0.0),
+                                Colors.white.withOpacity(
+                                  0.25,
+                                ), // Top-left flare (boosted slightly to survive the blur)
+                                Colors.white.withOpacity(0.0),
+                                Colors.white.withOpacity(
+                                  0.0,
+                                ), // Stays pitch black across the sides
+                                Colors.white.withOpacity(
+                                  0.12,
+                                ), // Bottom-right flare
+                                Colors.white.withOpacity(0.0),
+                                Colors.white.withOpacity(0.0),
+                              ],
+                              // 🔹 Pinched the stops tightly to create the classic narrow "Bowtie" shape
+                              stops: const [
+                                0.0,
+                                0.12, // Peak of top-left bowtie
+                                0.25, // Fades completely to dark
+                                0.50, // Holds dark
+                                0.62, // Peak of bottom-right bowtie
+                                0.75, // Fades completely to dark
+                                1.0,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ==========================================
+                // 3. 🔹 THE SPINNING ALBUM ART (Sandwiched on top of glare)
+                // ==========================================
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (_, child) => Transform.rotate(
+                    angle: _controller.value * 2 * math.pi,
+                    child: child,
+                  ),
+                  child: ClipOval(
+                    child: SizedBox(
+                      width: 90,
+                      height: 90,
+                      child: widget.albumArtUrl.isNotEmpty
+                          ? Image.network(widget.albumArtUrl, fit: BoxFit.cover)
+                          : Container(color: Colors.redAccent),
+                    ),
+                  ),
+                ),
+
+                // ==========================================
+                // 4. THE CENTER PIN HOLE
+                // ==========================================
                 IgnorePointer(
                   child: Container(
                     width: 12,
@@ -455,6 +521,10 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
                     ),
                   ),
                 ),
+
+                // ==========================================
+                // 5. THE PLAY / PAUSE OVERLAY
+                // ==========================================
                 GestureDetector(
                   onTap: _togglePlay,
                   child: Container(
@@ -1806,6 +1876,7 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
 
   @override
   Widget build(BuildContext context) {
+    // const Color buttonsBackgroundColor = Color(0xFF636A73);
     const Color buttonsBackgroundColor = Color(0xFF545454);
     // const Color buttonsBackgroundColor = Color(0xFF3D3D3D);
 
