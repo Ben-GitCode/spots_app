@@ -6,14 +6,15 @@ import 'package:just_audio/just_audio.dart';
 import 'package:spots_app/utils/models.dart';
 import 'package:spots_app/components/overlapping_reaction_stack.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 // Helper to format large numbers (e.g., 145000 -> 145K)
-String formatReactionsCount(int count) {
-  if (count >= 1000) {
-    return '${(count / 1000).toStringAsFixed(count % 1000 == 0 ? 0 : 1)}K';
-  }
-  return count.toString();
-}
+// String formatReactionsCount(int count) {
+//   if (count >= 1000) {
+//     return '${(count / 1000).toStringAsFixed(count % 1000 == 0 ? 0 : 1)}K';
+//   }
+//   return count.toString();
+// }
 
 String formatNumberWithCommas(int count) {
   var formatter = NumberFormat('#,###,###');
@@ -78,7 +79,8 @@ class TextMedia implements MomentMedia {
   @override
   Widget buildPreview(BuildContext context) {
     return Container(
-      color: const Color(0xFFE8E5D9),
+      // color: const Color(0xFFE8E5D9),
+      color: const Color(0xFFFFF3A9),
       padding: const EdgeInsets.all(16),
       child: Center(
         child: Text(
@@ -101,7 +103,8 @@ class TextMedia implements MomentMedia {
   Widget buildExpanded(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFFE8E5D9),
+      //color: const Color(0xFFE8E5D9),
+      color: const Color(0xFFFFF3A9),
       child: SingleChildScrollView(
         physics: const NeverScrollableScrollPhysics(), // Main card scrolls
         padding: const EdgeInsets.all(32),
@@ -371,7 +374,8 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E1366), Color(0xFF0A0626)],
+          // colors: [Color(0xFF1E1366), Color(0xFF0A0626)],
+          colors: [Color(0xFF304F8C), Color(0xFFD91E63), Color(0xFF1E1366)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -441,11 +445,21 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
                     ),
                   ),
                 ),
+                IgnorePointer(
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                      color: Colors.black,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
                 GestureDetector(
                   onTap: _togglePlay,
                   child: Container(
-                    width: 90,
-                    height: 90,
+                    width: 220,
+                    height: 220,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: _isPlaying
@@ -458,24 +472,14 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
                           : const Icon(
                               Icons.play_arrow_rounded,
                               color: Colors.white,
-                              size: 48,
+                              size: 100,
                             ),
-                    ),
-                  ),
-                ),
-                IgnorePointer(
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: const BoxDecoration(
-                      color: Colors.black,
-                      shape: BoxShape.circle,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 22),
             Text(
               widget.songTitle,
               textAlign: TextAlign.center,
@@ -485,31 +489,59 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
                 color: Colors.white,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 5),
             Text(
               widget.artist,
               style: const TextStyle(fontSize: 16, color: Colors.white70),
             ),
-            const SizedBox(height: 48),
+
+            const Divider(indent: 25, endIndent: 25),
+            //const SizedBox(height: 25),
             if (widget.platformLinks.isNotEmpty) ...[
-              const Text(
-                "Listen to full song on:",
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 12,
-                runSpacing: 12,
-                children: widget.platformLinks.entries
-                    .map(
-                      (entry) => _buildPlatformButton(entry.key, entry.value),
-                    )
-                    .toList(),
+              // const Text(
+              //   "Listen to full song on:",
+              //   style: TextStyle(
+              //     color: Color(0xFFF2F2F2),
+              //     fontSize: 12,
+              //     fontWeight: FontWeight.bold,
+              //   ),
+              // ),
+              const SizedBox(height: 8),
+              Builder(
+                builder: (context) {
+                  // 1. Generate the buttons and strip out the nulls
+                  final validButtons = widget.platformLinks.entries
+                      .map(
+                        (entry) => _buildPlatformButton(entry.key, entry.value),
+                      )
+                      .whereType<
+                        Widget
+                      >() // 🔹 Drops all the nulls from the list!
+                      .toList();
+
+                  // 2. If no valid streaming services exist, show the fallback
+                  if (validButtons.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(
+                        "No streaming service found",
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    );
+                  }
+
+                  // 3. Otherwise, render the wrap!
+                  return Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: validButtons,
+                  );
+                },
               ),
             ],
           ],
@@ -518,47 +550,66 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
     );
   }
 
-  Widget _buildPlatformButton(String platformName, String url) {
-    IconData icon;
-    Color color;
+  Widget? _buildPlatformButton(String platformName, String url) {
+    String svgPath;
     switch (platformName.toLowerCase()) {
       case 'spotify':
-        icon = Icons.library_music;
-        color = const Color(0xFF1DB954);
+        svgPath = 'assets/icons/spotify-icon.svg';
         break;
       case 'apple music':
       case 'apple':
-        icon = Icons.music_note;
-        color = const Color(0xFFFA243C);
+        svgPath = 'assets/icons/apple-music-icon.svg';
         break;
       case 'youtube':
-        icon = Icons.play_circle_filled;
-        color = const Color(0xFFFF0000);
+        svgPath = 'assets/icons/youtube-music-icon.svg';
         break;
       default:
-        icon = Icons.link;
-        color = Colors.white70;
+        return null;
     }
+
     return GestureDetector(
       onTap: () => _launchStreamingApp(url),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white24),
-        ),
-        child: Row(
+      // 🔹 1. SizedBox guarantees every item takes up the exact same horizontal space in the Wrap
+      child: SizedBox(
+        width: 60,
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
+            // 🔹 2. The Squircle wrapping ONLY the icon
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(
+                  16,
+                ), // Gives it the rounded square look
+                border: Border.all(color: Colors.white.withOpacity(0.15)),
+              ),
+              child: Center(
+                child: SvgPicture.asset(
+                  svgPath,
+                  width:
+                      26, // Scaled slightly to fit the new 56x56 box perfectly
+                  height: 26,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8), // Gap between the icon box and the text
+            // 🔹 3. The Text sitting underneath
             Text(
-              platformName.toUpperCase(),
+              platformName.toUpperCase().replaceAll(' ', '\n'),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Colors.white,
+                color: Colors.white70,
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: 10,
+                height: 1.1,
+                letterSpacing: 0.5,
               ),
             ),
           ],
@@ -816,7 +867,8 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
         SpotReactions.funny: 40000,
         SpotReactions.wow: 5000,
       },
-      caption: "This view is insane at sunset!",
+      caption:
+          "This view is insane at sunset! You should visit the roof, it has a great view. came here at 4 PM and barely had any crowd with all the view for myself :)",
       commentCount: 56,
       payload: {
         'type': 'photo',
@@ -969,7 +1021,8 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
     final double screenWidth = MediaQuery.of(context).size.width;
     final double cardWidth = screenWidth * 0.85;
     final double safePageViewHeight =
-        cardWidth + 140; // 1:1 Aspect + Date Text + Margins
+        cardWidth +
+        130; // 1:1 Aspect + Date Text + Margins (was 140 originally)
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F2EB),
@@ -1124,7 +1177,7 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withOpacity(0.5),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -1736,7 +1789,8 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
           shape: BoxShape.circle,
           // 🔹 Shows the Grey Selection Circle
           color: isSelected
-              ? Colors.grey.withValues(alpha: 0.4)
+              // ? Colors.grey.withValues(alpha: 0.4)
+              ? Colors.green.withValues(alpha: 0.4)
               : Colors.transparent,
         ),
         child: Image.asset(
@@ -1756,7 +1810,7 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
     // const Color buttonsBackgroundColor = Color(0xFF3D3D3D);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.black.withValues(alpha: 0.85),
       body: SafeArea(
         child: Column(
           children: [
@@ -1840,7 +1894,7 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
                                       color: Colors.white,
                                       padding: const EdgeInsets.fromLTRB(
                                         20,
-                                        28,
+                                        7,
                                         20,
                                         20,
                                       ),
@@ -1851,7 +1905,7 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
                                           Row(
                                             children: [
                                               const SizedBox(
-                                                width: 56,
+                                                width: 50,
                                               ), // Leaves room for avatar
                                               Expanded(
                                                 child: Text(
@@ -1905,12 +1959,15 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
                                             ],
                                           ),
 
+                                          const SizedBox(height: 10),
+
                                           // Conditionally render the caption only if it exists
                                           if (widget
                                               .moment
                                               .caption
                                               .isNotEmpty) ...[
-                                            const SizedBox(height: 16),
+                                            const Divider(height: 1),
+                                            const SizedBox(height: 12),
                                             Text(
                                               widget.moment.caption,
                                               style: const TextStyle(
@@ -1928,8 +1985,8 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
 
                                 // C. Overlapping Avatar (Seamed dynamically!)
                                 Positioned(
-                                  left: 20,
-                                  top: mediaHeight - 24,
+                                  left: 0,
+                                  top: mediaHeight - 30,
                                   child: Container(
                                     padding: const EdgeInsets.all(3),
                                     decoration: const BoxDecoration(
@@ -1937,7 +1994,7 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
                                       shape: BoxShape.circle,
                                     ),
                                     child: CircleAvatar(
-                                      radius: 22,
+                                      radius: 30,
                                       backgroundImage: NetworkImage(
                                         widget.moment.avatarUrl,
                                       ),
@@ -2029,7 +2086,7 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
                             right: Radius.circular(22),
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.only(left: 6, right: 10),
+                            padding: const EdgeInsets.only(left: 10, right: 15),
                             // 🔹 THE DYNAMIC ICON: Shows selected image OR the default icon!
                             child: widget.moment.userReaction != null
                                 ? Image.asset(
@@ -2048,31 +2105,38 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
                     ),
                   ),
 
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: buttonsBackgroundColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.bookmark_border,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: buttonsBackgroundColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.share_outlined,
-                      color: Colors.white,
-                      size: 22,
-                    ),
+                  //const SizedBox(width: 8),
+                  const Spacer(),
+
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: buttonsBackgroundColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.bookmark_border,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: buttonsBackgroundColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.share_outlined,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

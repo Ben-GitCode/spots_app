@@ -153,13 +153,33 @@ class OverlappingReactionStack extends StatelessWidget {
     required this.counterTextColor,
   });
 
+  // String _formatReactionsCount(int count) {
+  //   if (count >= 1000000) {
+  //     return '${(count / 1000000).toStringAsFixed(count % 1000000 == 0 ? 0 : 1)}M';
+  //   }
+  //   if (count >= 1000) {
+  //     return '${(count / 1000).toStringAsFixed(count % 1000 == 0 ? 0 : 1)}K';
+  //   }
+  //   return count.toString();
+  // }
   String _formatReactionsCount(int count) {
     if (count >= 1000000) {
-      return '${(count / 1000000).toStringAsFixed(count % 1000000 == 0 ? 0 : 1)}M';
+      // 1. Integer divide by 100,000 to truncate cleanly, then divide by 10
+      // Example: 1,450,000 -> 14.5 -> 14 -> 1.4
+      double value = (count ~/ 100000) / 10.0;
+
+      // 2. If it's a clean number (e.g. 1.0), print as int. Otherwise, print as double.
+      return '${value == value.toInt() ? value.toInt() : value}M';
     }
+
     if (count >= 1000) {
-      return '${(count / 1000).toStringAsFixed(count % 1000 == 0 ? 0 : 1)}K';
+      // Example: 1,450 -> 14.5 -> 14 -> 1.4
+      // Example: 1,040 -> 10.4 -> 10 -> 1.0 -> 1
+      double value = (count ~/ 100) / 10.0;
+
+      return '${value == value.toInt() ? value.toInt() : value}K';
     }
+
     return count.toString();
   }
 

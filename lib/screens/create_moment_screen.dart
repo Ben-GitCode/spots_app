@@ -8,6 +8,8 @@ import 'package:spots_app/media_attachments/camera_attachment.dart';
 import 'package:spots_app/media_attachments/audio_attachment.dart';
 import 'package:spots_app/media_attachments/music_attachment.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 //enum MediaType { text, camera, audio, music, poll, gallery }
 
@@ -157,7 +159,7 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
   }
 
   Future<void> _uploadAndSaveMoment() async {
-    // 1. Lock the UI
+    // Lock the UI instantly
     setState(() => _isUploading = true);
     HapticFeedback.heavyImpact();
 
@@ -167,83 +169,76 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
 
       if (userId == null) throw Exception("User must be logged in to post.");
 
-      Map<String, dynamic>? finalMediaPayload;
+      // 1. INSTANT GPS LOCK
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
 
-      // 2. Process the Media Attachment (If one exists)
+      String? finalMediaUrl; // 🔹 Will hold the raw string to pass to p_content
+
+      // 2. Upload the file and grab the URL
       if (_activeAttachment != null) {
-        // Grab a fresh copy of the JSON payload
         final rawJson = Map<String, dynamic>.from(_activeAttachment!.toJson());
         final type = rawJson['type'];
 
-        // 🔹 If it's a file, we MUST upload it to Storage first
         if (type == 'image' || type == 'video' || type == 'audio') {
           final localPath = rawJson['path'] as String?;
           if (localPath != null) {
             final file = File(localPath);
-            final fileExtension = localPath.split('.').last;
+            if (!await file.exists()) throw Exception("Local file not found.");
 
-            // Create a unique file path: userId/timestamp.ext
+            final fileExtension = localPath.split('.').last;
             final storagePath =
                 '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
 
-            // Upload to your Supabase bucket (Make sure 'moment_media' exists in your dashboard!)
+            // Upload the file
             await supabase.storage
                 .from('moment_media')
                 .upload(storagePath, file);
 
-            // Get the remote URL and swap it into our JSON payload
-            final remoteUrl = supabase.storage
+            // Grab the public URL
+            finalMediaUrl = supabase.storage
                 .from('moment_media')
                 .getPublicUrl(storagePath);
-            rawJson['url'] = remoteUrl;
-            rawJson.remove('path'); // Delete the useless local path
-
-            // 🔹 Special Case: Video Thumbnails
-            if (type == 'video' && rawJson['thumbnail'] != null) {
-              final thumbFile = File(rawJson['thumbnail']);
-              final thumbPath =
-                  '$userId/${DateTime.now().millisecondsSinceEpoch}_thumb.jpg';
-
-              await supabase.storage
-                  .from('moment_media')
-                  .upload(thumbPath, thumbFile);
-              rawJson['thumbnail_url'] = supabase.storage
-                  .from('moment_media')
-                  .getPublicUrl(thumbPath);
-              rawJson.remove('thumbnail');
-            }
           }
+        } else if (type == 'music') {
+          // For testing music, just pass the preview URL string
+          finalMediaUrl = rawJson['preview_url'];
+        } else if (type == 'poll') {
+          // For testing polls, just pass the question as a string
+          finalMediaUrl = "Poll: ${rawJson['question']}";
         }
-
-        // Polls and Music bypass the storage upload completely and just pass through
-        finalMediaPayload = rawJson;
       }
 
-      // 3. Save to the Database
-      // Make sure your table is called 'moments' and has these exact column names
-      await supabase.from('moments').insert({
-        'user_id': userId,
-        'caption': _textController.text.trim(),
-        'privacy_level': _selectedPrivacy.id,
-        'media_payload':
-            finalMediaPayload, // Supabase natively accepts JSON/Map objects here!
-        'created_at': DateTime.now().toIso8601String(),
-      });
+      // 3. THE RPC CALL
+      // Maps exactly to the arguments expected by your SQL function
+      final responseId = await supabase.rpc(
+        'create_moment',
+        params: {
+          'p_caption': _textController.text
+              .trim(), // Matches 'caption' in your SQL
+          'p_content': finalMediaUrl, // The URL of the uploaded file
+          'p_lat': position.latitude, // Raw double
+          'p_lng': position.longitude, // Raw double
+          'p_reaction_type': null, // No reaction upon initial creation
+        },
+      );
 
-      // 4. Success! Close the screen
-      if (mounted) Navigator.pop(context);
+      debugPrint("Successfully created test moment with ID: $responseId");
+
+      HapticFeedback.lightImpact();
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       debugPrint("Upload Failed: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Failed to post moment. Try again."),
+            content: Text("Failed to post moment: $e"),
             backgroundColor: Colors.redAccent,
           ),
         );
       }
     } finally {
-      // Unlock the UI if it failed so they can try again
       if (mounted) setState(() => _isUploading = false);
     }
   }
