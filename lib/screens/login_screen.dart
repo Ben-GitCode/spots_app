@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'sign_up_screen.dart';
+import 'map_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,7 +37,10 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         // 👉 Move to your map screen
-        Navigator.pushReplacementNamed(context, '/map');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MapScreen()),
+        );
       } else {
         throw 'Login failed';
       }

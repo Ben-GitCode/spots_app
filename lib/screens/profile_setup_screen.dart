@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'map_screen.dart';
 import 'package:spots_app/utils/user_data.dart';
 import 'package:provider/provider.dart';
+import 'package:spots_app/providers/user_provider.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});

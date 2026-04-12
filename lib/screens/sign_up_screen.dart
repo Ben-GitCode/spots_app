@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_setup_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:spots_app/utils/user_data.dart';
+import 'package:spots_app/providers/user_provider.dart';
 
 class CreateUserScreen extends StatefulWidget {
   const CreateUserScreen({super.key});

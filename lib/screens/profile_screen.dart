@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'achievements_screen.dart';
-import 'package:spots_app/utils/user_data.dart';
 import 'package:provider/provider.dart';
+import 'package:spots_app/providers/user_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   final int worldPercentage;
@@ -27,6 +27,11 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.currentUser;
+
+    // If user is null, show a loading spinner or placeholder
+    if (user == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     
   return Stack(
     clipBehavior: Clip.none,
@@ -195,7 +200,7 @@ class ProfileScreen extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(top: 5, bottom: 10),
               child: Text(
-                usernameTest!,
+                usernameTest ?? "Loading...", // ✅ Safe fallback
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
