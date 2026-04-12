@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'achievements_screen.dart';
-import 'package:spots_app/utils/user_data.dart';
 import 'package:provider/provider.dart';
+import 'package:spots_app/providers/user_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   final int worldPercentage;
@@ -27,6 +27,11 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.currentUser;
+
+    // If user is null, show a loading spinner or placeholder
+    if (user == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     
   return Stack(
     clipBehavior: Clip.none,
@@ -42,6 +47,16 @@ class ProfileScreen extends StatelessWidget {
           borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
           child: Column(
             children: [
+              const SizedBox(height: 12), // Space above the line
+              Container(
+                width: 80,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: Colors.black26, // Subtly dark, looks like a standard UI handle
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              //const SizedBox(height: 2), // Space below the line
               // Use Expanded so the CustomScrollView knows its boundaries
               Expanded(
                 child: CustomScrollView(
@@ -141,16 +156,9 @@ class ProfileScreen extends StatelessWidget {
         ),
       ),
 
-      // Floating World Percentage Circle
-      Positioned(
-        top: -35, // Moves it 35 pixels ABOVE the top of the white box
-        right: 25,
-        child: _buildCircularPercentage(worldPercentage.toDouble()),
-      ),
-
       // Floating Profile Photo
       Positioned(
-        top: 0,
+        top: 10,
         left: 20,
         child: GestureDetector(
           onTap: () => _showProfileOptions(context),
@@ -192,7 +200,7 @@ class ProfileScreen extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(top: 5, bottom: 10),
               child: Text(
-                usernameTest!,
+                usernameTest ?? "Loading...", // ✅ Safe fallback
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -242,6 +250,15 @@ class ProfileScreen extends StatelessWidget {
             onPressed: () => _openAchievementsScreen(context),
             tooltip: 'Open Achievements',
             color: Colors.black87,
+          ),
+
+          const SizedBox(width: 10),
+
+          // Floating World Percentage Circle
+          Positioned(
+            // top: 110, // Moves it 35 pixels ABOVE the top of the white box
+            // right: 25,
+            child: _buildCircularPercentage(worldPercentage.toDouble()),
           ),
         ],
       ),
@@ -337,7 +354,7 @@ class ProfileScreen extends StatelessWidget {
   // The horizontal list of collections (Trips, Guides, etc.) with the "New Collection" box at the start
   Widget _buildCollectionsSection() {
     return SizedBox(
-      height: 140,
+      height: 125,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         scrollDirection: Axis.horizontal,
@@ -359,100 +376,115 @@ class ProfileScreen extends StatelessWidget {
   }
 
   // A single card in the collections row, which can either be a collection or the "New Collection" button
+  // Revised to look like a layered, paper-clipped scrapbook entry (as requested in user_input_3.png)
   Widget _buildCollectionCard(String title, String imageUrl) {
-    final bool isAddButton = imageUrl == "add_button";
+  final bool isAddButton = imageUrl == "add_button";
+  const Color polaroidBorderColor = Color(0xFFC7CDCF);
 
-    return Container(
-      width: 115,
-      margin: const EdgeInsets.only(right: 14, top: 10, bottom: 5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Column(
-          children: [
-            // 1. Top Section (Image + Lock Overlay)
-            Expanded(
-              flex: 2,
-              child: Stack(
-                children: [
-                  // Background Layer (Image or Grey placeholder)
-                  Container(
-                    width: double.infinity,
-                    height: double.infinity, // Ensures it fills the Stack
-                    decoration: BoxDecoration(
-                      color: isAddButton ? Colors.white : Colors.grey[300],
-                      image: isAddButton
-                          ? null
-                          : DecorationImage(
-                              image: NetworkImage(imageUrl),
-                              fit: BoxFit.cover,
-                            ),
-                    ),
-                    child: isAddButton
-                        ? const Center(
-                            child: Icon(
-                              Icons.add,
-                              color: Colors.black87,
-                              size: 60,
-                            ),
-                          )
-                        : null,
-                  ),
-                  // Lock Icon Overlay (Only if not the add button)
-                  if (!isAddButton)
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.8),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.lock_outline,
-                            size: 18, color: Colors.black87),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // 2. Bottom Section (Text Chin)
-            Expanded(
-              flex: 1,
+  return Container(
+    width: 100, // Reduced from 140
+    margin: const EdgeInsets.only(right: 12, top: 10, bottom: 5),
+    child: Stack(
+      clipBehavior: Clip.none, 
+      alignment: Alignment.center,
+      children: [
+        
+        // --- THE LAYERS (Background) ---
+        for (int i = 0; i < 2; i++)
+          Positioned(
+            // top: 1.5 * i,
+            // left: 1.5 * i,
+            child: Transform.rotate(
+              angle: (i == 0) ? 0.3 : 0.1, 
               child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                alignment: Alignment.center,
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF4A5568),
-                    height: 1.2,
-                  ),
+                width: 100, // Scaled down
+                height: 100,
+                decoration: BoxDecoration(
+                  color: (i == 0) ? const Color.fromARGB(31, 122, 118, 118) : const Color.fromARGB(255, 200, 204, 204),
+                  borderRadius: BorderRadius.circular(10), 
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
+          ),
 
+        // --- THE POLAROID (Main Content) ---
+        Container(
+          width: 90, // Reduced width
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: polaroidBorderColor, width: 1.5),
+            borderRadius: BorderRadius.circular(15), 
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Photo Frame
+              Padding(
+                padding: const EdgeInsets.all(5.0), // Tighter padding
+                child: Container(
+                  height: 65, // Much smaller photo height
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: isAddButton
+                        ? const Center(
+                            child: Icon(Icons.add, color: Colors.black45, size: 30),
+                          )
+                        : Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                          ),
+                  ),
+                ),
+              ),
+              
+              // Title text
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6, left: 4, right: 4),
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10, // Smaller font
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // --- THE PAPERCLIP (Scaled down) ---
+        Positioned(
+          top: -5,
+          right: -8,
+          child: Transform.rotate(
+            angle: 0.6, // Tweak this number to change the tilt (try 0.4 to 0.8)
+            child: Icon(
+              Icons.attach_file,
+              size: 40, // Reduced from 45
+              color: Colors.black.withOpacity(0.8),
+            ),
+          ),
+        )
+      ],
+    ),
+  );
+}
 
   // The horizontal row with the Sort and Filter buttons, which becomes sticky when scrolling
   Widget _buildSortFilterRow() {

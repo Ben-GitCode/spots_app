@@ -1,19 +1,8 @@
-import 'package:flutter/material.dart';
 import 'stamp_data.dart';
 import 'collection_data.dart';
 import 'moment_data.dart';
 
-class UserProvider extends ChangeNotifier {
-  UserData? _currentUser;
 
-  UserData? get currentUser => _currentUser;
-
-  // Function to set the user after Signup/Login
-  void setUser(UserData user) {
-    _currentUser = user;
-    notifyListeners(); // This tells all screens to rebuild with new data!
-  }
-}
 
 class UserData {
   final String userID;

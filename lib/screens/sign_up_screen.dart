@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_setup_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:spots_app/utils/user_data.dart';
+import 'package:spots_app/providers/user_provider.dart';
 
 class CreateUserScreen extends StatefulWidget {
   const CreateUserScreen({super.key});
@@ -47,7 +48,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
         final newUser = UserData(
           userID: user.id,
           username: nameController.text.trim(),
-          profilePictureUrl: "https://nyprkwgliwnyktcqsfsf.supabase.co/storage/v1/object/public/profile_pictures/clker-free-vector-images-profile-42914.svg", 
+          profilePictureUrl: "https://nyprkwgliwnyktcqsfsf.supabase.co/storage/v1/object/public/profile_pictures/wanderercreative-blank-profile-picture-973460_640.png", 
           dataJoined: DateTime.now(),
           worldPercentage: 0,
           contributionsCount: 0,

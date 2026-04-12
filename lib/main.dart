@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'screens/login_screen.dart';
 import 'utils/user_data.dart';
 import 'package:provider/provider.dart';
+import 'providers/user_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
