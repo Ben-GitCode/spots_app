@@ -19,6 +19,7 @@ import 'package:spots_app/utils/models.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'traces_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/intl.dart';
 
 import 'profile_scrapbook.dart';
 
@@ -280,7 +281,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    
     return Scaffold(
       body: FutureBuilder<Directory>(
         future: _cacheDir,
@@ -590,11 +590,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                   child: const Center(
                     child: Text(
-                      "Preview Spot",
+                      "View Spot",
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: 18,
                       ),
                     ),
                   ),
@@ -665,11 +665,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   String _formatDistance(double? meters) {
     if (meters == null) return "Locating...";
 
+    final formatter = NumberFormat('#,###.#');
+
     if (meters < 1000) {
-      return "${meters.ceil()}m away";
+      return "${formatter.format(meters.ceil())}m away";
     } else {
-      // Divides by 1000 and shows 1 decimal place (e.g., 1.2km)
-      return "${(meters / 1000).toStringAsFixed(1)}km away";
+      double km = meters / 1000;
+      return "${formatter.format(km)}km away";
     }
   }
 
