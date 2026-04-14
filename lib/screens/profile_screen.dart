@@ -171,7 +171,7 @@ class ProfileScreen extends StatelessWidget {
               image: DecorationImage(
                 image: NetworkImage(
                   // Use the URL from your UserData class, with a fallback if it's null
-                  user!.profilePictureUrl,
+                  user.profilePictureUrl,
                 ),
               ),
               boxShadow: [

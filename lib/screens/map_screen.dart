@@ -24,6 +24,9 @@ import 'profile_scrapbook.dart';
 
 import 'edge_function_test_screen.dart';
 
+import 'package:spots_app/providers/user_provider.dart';
+import 'package:provider/provider.dart';
+
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -280,7 +283,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    
+     final userProvider = Provider.of<UserProvider>(context);
+      final user = userProvider.currentUser;
     return Scaffold(
       body: FutureBuilder<Directory>(
         future: _cacheDir,
@@ -429,7 +433,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ),
 
               /// 4. BOTTOM TOOLBAR
-              Positioned(bottom: 20, left: 0, right: 0, child: _buildToolbar()),
+              Positioned(bottom: 20, left: 0, right: 0, child: _buildToolbar(user)),
             ],
           );
         },
@@ -792,7 +796,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildToolbar() {
+  Widget _buildToolbar(final user) {
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.center,
@@ -822,11 +826,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 onPressed: _openStepsSheet,
               ),
               const SizedBox(width: 60),
-              IconButton(
-                icon: const Icon(Icons.person_outline),
-                color: Colors.white,
-                iconSize: 40,
-                onPressed: _openProfileScreen,
+              GestureDetector(
+                onTap: _openProfileScreen,
+                child: CircleAvatar(
+                  radius: 25,
+                  backgroundImage: NetworkImage(user!.profilePictureUrl),
+                ),
               ),
             ],
           ),
