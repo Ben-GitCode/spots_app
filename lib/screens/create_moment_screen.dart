@@ -175,7 +175,7 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      Map<String, dynamic> finalMediaPayload = {};
+      Map<String, dynamic>? finalMediaPayload = null;
 
       if (_activeAttachment != null) {
         final rawJson = Map<String, dynamic>.from(_activeAttachment!.toJson());
@@ -295,18 +295,8 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
           }
         } else if (type == 'poll') {
           // --- POLL DATA ---
-          finalMediaPayload = {
-            'type': 'poll',
-            'question': rawJson['question'],
-            'options': rawJson['options'],
-          };
+          finalMediaPayload = {'type': 'poll', 'options': rawJson['options']};
         }
-      } else {
-        // --- TEXT ONLY ---
-        finalMediaPayload = {
-          'type': 'text',
-          'text': _textController.text.trim(),
-        };
       }
 
       // 4. THE RPC CALL
