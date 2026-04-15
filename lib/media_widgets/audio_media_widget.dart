@@ -5,8 +5,8 @@ import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 
 class AudioMediaWidget extends StatefulWidget {
-  // 🔹 This is how the child talks to the parent!
-  final Function(String audioPath) onAudioCaptured;
+  // 🔹 FIX: The callback now passes BOTH the path and the formatted duration!
+  final Function(String audioPath, String durationFormatted) onAudioCaptured;
 
   const AudioMediaWidget({super.key, required this.onAudioCaptured});
 
@@ -42,15 +42,25 @@ class _AudioMediaWidgetState extends State<AudioMediaWidget>
 
   Future<void> _toggleRecording() async {
     HapticFeedback.heavyImpact();
+
     if (_isRecording) {
       final path = await _audioRecorder.stop();
       _recordTimer?.cancel();
+
+      // 🔹 Format the duration string right before we stop
+      String minutes = (_recordDuration ~/ 60).toString();
+      String seconds = (_recordDuration % 60).toString().padLeft(2, '0');
+      String finalDuration = "$minutes:$seconds";
+
       setState(() {
         _isRecording = false;
         _audioPath = path;
       });
-      // 🔹 Send the data back up to the parent screen!
-      if (path != null) widget.onAudioCaptured(path);
+
+      // 🔹 Send BOTH pieces of data back up to the parent screen!
+      if (path != null) {
+        widget.onAudioCaptured(path, finalDuration);
+      }
     } else {
       if (await _audioRecorder.hasPermission()) {
         final tempDir = await getTemporaryDirectory();
@@ -64,6 +74,7 @@ class _AudioMediaWidgetState extends State<AudioMediaWidget>
           _recordDuration = 0;
           _audioPath = null;
         });
+
         _recordTimer = Timer.periodic(
           const Duration(seconds: 1),
           (t) => setState(() => _recordDuration++),

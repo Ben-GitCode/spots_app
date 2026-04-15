@@ -112,7 +112,10 @@ class AudioAttachment extends MediaAttachment {
 
   @override
   Map<String, dynamic> toJson() {
-    return {'type': 'audio', 'path': audioPath};
+    // 🔹 FIX: Format the exact duration and pass it to the uploader!
+    String seconds = recordDuration.toString().padLeft(2, '0');
+
+    return {'type': 'audio', 'path': audioPath, 'duration': '0:$seconds'};
   }
 
   @override
@@ -255,7 +258,7 @@ class _AudioEditorUIState extends State<_AudioEditorUI>
               onTap: att.discardAudio,
               child: Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.white12,
                   shape: BoxShape.circle,
                 ),

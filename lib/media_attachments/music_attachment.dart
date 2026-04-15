@@ -166,7 +166,7 @@ class MusicAttachment extends MediaAttachment {
       'artist': selectedTrack?.artist,
       'art_url': selectedTrack?.artUrl,
       'preview_url': selectedTrack?.previewUrl,
-      'external_url': selectedTrack?.externalUrl,
+      'url': selectedTrack?.externalUrl,
     };
   }
 
