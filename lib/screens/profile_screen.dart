@@ -67,7 +67,7 @@ class ProfileScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildNameHeader(user?.username),
+                          _buildNameHeader(user, context),
                           const SizedBox(height: 15),
                           _buildStatsAndPassport(context),
                           const SizedBox(height: 20),
@@ -190,7 +190,7 @@ class ProfileScreen extends StatelessWidget {
 }
 
   // The header with the username, aligned to the right of the profile photo
-  Widget _buildNameHeader(String? usernameTest) {
+  Widget _buildNameHeader(final user, BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -200,7 +200,7 @@ class ProfileScreen extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(top: 5, bottom: 10),
               child: Text(
-                usernameTest ?? "Loading...", // ✅ Safe fallback
+                user.username,
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -222,6 +222,7 @@ class ProfileScreen extends StatelessWidget {
             icon: const Icon(Icons.settings, size: 20),
             color: Colors.black87,
             onPressed: () {
+              context.read<UserProvider>().logout();
               // TODO: Navigate to Settings
             },
           ),

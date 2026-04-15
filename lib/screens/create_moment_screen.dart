@@ -10,6 +10,8 @@ import 'package:spots_app/media_attachments/music_attachment.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 //enum MediaType { text, camera, audio, music, poll, gallery }
 
@@ -159,7 +161,6 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
   }
 
   Future<void> _uploadAndSaveMoment() async {
-    // Lock the UI instantly
     setState(() => _isUploading = true);
     HapticFeedback.heavyImpact();
 
@@ -174,57 +175,152 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      String? finalMediaUrl; // 🔹 Will hold the raw string to pass to p_content
+      Map<String, dynamic> finalMediaPayload = {};
 
-      // 2. Upload the file and grab the URL
       if (_activeAttachment != null) {
         final rawJson = Map<String, dynamic>.from(_activeAttachment!.toJson());
-        final type = rawJson['type'];
+        final String type = rawJson['type'] ?? 'text';
 
         if (type == 'image' || type == 'video' || type == 'audio') {
+          // --- UPLOADABLE MEDIA ---
           final localPath = rawJson['path'] as String?;
           if (localPath != null) {
             final file = File(localPath);
             if (!await file.exists()) throw Exception("Local file not found.");
 
-            final fileExtension = localPath.split('.').last;
-            final storagePath =
-                '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+            // 🔹 NEW: Check the exact byte size of the file on the phone
+            final int fileSize = await file.length();
+            debugPrint("🚨 PRE-UPLOAD FILE SIZE: $fileSize bytes");
 
-            // Upload the file
+            if (fileSize == 0) {
+              throw Exception(
+                "The video file is 0 bytes! The camera hasn't finished writing it to disk.",
+              );
+            }
+
+            // 🔹 Decoupled Naming: Timestamp + 4 random characters guarantees uniqueness in the bucket
+            final fileExtension = localPath.split('.').last;
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            final storagePath = '$userId/$timestamp.$fileExtension';
+
+            // Upload the file to the 'moment_storage' bucket
             await supabase.storage
                 .from('moment_media')
                 .upload(storagePath, file);
 
             // Grab the public URL
-            finalMediaUrl = supabase.storage
+            final publicUrl = supabase.storage
                 .from('moment_media')
                 .getPublicUrl(storagePath);
+
+            // --- 2. UPLOAD THUMBNAIL (IF IT EXISTS) ---
+            String? thumbnailUrl;
+            final thumbPath =
+                rawJson['thumbnail']
+                    as String?; // Extracted from your CameraAttachment!
+
+            if (thumbPath != null && thumbPath.isNotEmpty) {
+              final thumbFile = File(thumbPath);
+              if (await thumbFile.exists()) {
+                final thumbExtension = thumbPath.split('.').last;
+                // Append '_thumb' so it lives right next to the main file in the bucket
+                final thumbStoragePath =
+                    '$userId/${timestamp}_thumb.$thumbExtension';
+
+                await supabase.storage
+                    .from('moment_media')
+                    .upload(thumbStoragePath, thumbFile);
+
+                thumbnailUrl = supabase.storage
+                    .from('moment_media')
+                    .getPublicUrl(thumbStoragePath);
+              }
+            }
+
+            // --- 3. BUILD THE JSON PAYLOAD ---
+            if (type == 'audio') {
+              finalMediaPayload = {
+                'type': 'audio',
+                'title': rawJson['title'] ?? 'Voice Note',
+                'duration': rawJson['duration'] ?? '0:00',
+                'url': publicUrl,
+              };
+            } else {
+              // This dynamically handles both 'photo' and 'video'
+              finalMediaPayload = {'type': type, 'url': publicUrl};
+
+              // Only inject the thumbnail key if we successfully uploaded one!
+              if (thumbnailUrl != null) {
+                finalMediaPayload['thumbnail_url'] = thumbnailUrl;
+              }
+            }
           }
         } else if (type == 'music') {
-          // For testing music, just pass the preview URL string
-          finalMediaUrl = rawJson['preview_url'];
+          // --- ODESLI API INTEGRATION ---
+          final String originalUrl = rawJson['url'];
+          final encodedUrl = Uri.encodeComponent(originalUrl);
+
+          final odesliRes = await http.get(
+            Uri.parse('https://api.song.link/v1-alpha.1/links?url=$encodedUrl'),
+          );
+
+          if (odesliRes.statusCode == 200) {
+            final odesliData = json.decode(odesliRes.body);
+            final entityUniqueId = odesliData['entityUniqueId'];
+            final entitiesByUniqueId = odesliData['entitiesByUniqueId'];
+            final linksByPlatform = odesliData['linksByPlatform'];
+
+            final primaryEntity = entitiesByUniqueId[entityUniqueId];
+
+            Map<String, String> platformLinks = {};
+            if (linksByPlatform.containsKey('spotify'))
+              platformLinks['Spotify'] = linksByPlatform['spotify']['url'];
+            if (linksByPlatform.containsKey('appleMusic'))
+              platformLinks['Apple Music'] =
+                  linksByPlatform['appleMusic']['url'];
+            if (linksByPlatform.containsKey('youtubeMusic'))
+              platformLinks['YouTube Music'] =
+                  linksByPlatform['youtubeMusic']['url'];
+
+            finalMediaPayload = {
+              'type': 'music',
+              'song_title': primaryEntity['title'] ?? 'Unknown Title',
+              'artist': primaryEntity['artistName'] ?? 'Unknown Artist',
+              'album_art': primaryEntity['thumbnailUrl'] ?? '',
+              'preview_url': originalUrl,
+              'platform_links': platformLinks,
+            };
+          } else {
+            throw Exception("Could not fetch song data from Odesli.");
+          }
         } else if (type == 'poll') {
-          // For testing polls, just pass the question as a string
-          finalMediaUrl = "Poll: ${rawJson['question']}";
+          // --- POLL DATA ---
+          finalMediaPayload = {
+            'type': 'poll',
+            'question': rawJson['question'],
+            'options': rawJson['options'],
+          };
         }
+      } else {
+        // --- TEXT ONLY ---
+        finalMediaPayload = {
+          'type': 'text',
+          'text': _textController.text.trim(),
+        };
       }
 
-      // 3. THE RPC CALL
-      // Maps exactly to the arguments expected by your SQL function
-      final responseId = await supabase.rpc(
-        'create_moment',
+      // 4. THE RPC CALL
+      await supabase.rpc(
+        'create_moment_with_spot',
         params: {
-          'p_caption': _textController.text
-              .trim(), // Matches 'caption' in your SQL
-          'p_content': finalMediaUrl, // The URL of the uploaded file
-          'p_lat': position.latitude, // Raw double
-          'p_lng': position.longitude, // Raw double
-          'p_reaction_type': null, // No reaction upon initial creation
+          'p_caption': _textController.text.trim(),
+          'p_media_payload': finalMediaPayload,
+          'p_lat': position.latitude,
+          'p_lng': position.longitude,
         },
       );
 
-      debugPrint("Successfully created test moment with ID: $responseId");
+      debugPrint("Successfully created moment!");
 
       HapticFeedback.lightImpact();
       if (mounted) Navigator.pop(context, true);

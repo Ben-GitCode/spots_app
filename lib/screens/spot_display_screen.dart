@@ -441,52 +441,70 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
                 // ==========================================
                 // 2. 🔹 THE STATIC LIGHT REFLECTION (THE BOWTIE FIX)
                 // ==========================================
-                RepaintBoundary(
-                  child: IgnorePointer(
+                IgnorePointer(
+                  child: SizedBox(
+                    width: 220,
+                    height: 220,
                     child: ClipOval(
-                      // 🔹 Prevents the blur from leaking outside the record
+                      // 🔹 Guarantees the blur is cut into a perfect circle
                       child: ImageFiltered(
-                        // 🔹 The Magic Fix: Blurs the harsh GPU polygons into a smooth photographic reflection
+                        // 🔹 This blur engine is bulletproof on Android emulators
                         imageFilter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                        child: Container(
-                          width: 220,
-                          height: 220,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: SweepGradient(
-                              transform: const GradientRotation(-math.pi / 4),
-                              colors: [
-                                Colors.white.withOpacity(0.0),
-                                Colors.white.withOpacity(
-                                  0.25,
-                                ), // Top-left flare (boosted slightly to survive the blur)
-                                Colors.white.withOpacity(0.0),
-                                Colors.white.withOpacity(
-                                  0.0,
-                                ), // Stays pitch black across the sides
-                                Colors.white.withOpacity(
-                                  0.12,
-                                ), // Bottom-right flare
-                                Colors.white.withOpacity(0.0),
-                                Colors.white.withOpacity(0.0),
-                              ],
-                              // 🔹 Pinched the stops tightly to create the classic narrow "Bowtie" shape
-                              stops: const [
-                                0.0,
-                                0.12, // Peak of top-left bowtie
-                                0.25, // Fades completely to dark
-                                0.50, // Holds dark
-                                0.62, // Peak of bottom-right bowtie
-                                0.75, // Fades completely to dark
-                                1.0,
-                              ],
-                            ),
-                          ),
+                        child: CustomPaint(
+                          size: const Size(220, 220),
+                          painter: VinylGlarePainter(),
                         ),
                       ),
                     ),
                   ),
                 ),
+
+                // RepaintBoundary(
+                //   child: IgnorePointer(
+                //     child: ClipOval(
+                //       // 🔹 Prevents the blur from leaking outside the record
+                //       child: ImageFiltered(
+                //         // 🔹 The Magic Fix: Blurs the harsh GPU polygons into a smooth photographic reflection
+                //         imageFilter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                //         child: Container(
+                //           width: 220,
+                //           height: 220,
+                //           decoration: BoxDecoration(
+                //             shape: BoxShape.circle,
+                //             gradient: SweepGradient(
+                //               transform: const GradientRotation(-math.pi / 4),
+                //               colors: [
+                //                 Colors.white.withOpacity(0.0),
+                //                 Colors.white.withOpacity(
+                //                   0.25,
+                //                 ), // Top-left flare (boosted slightly to survive the blur)
+                //                 Colors.white.withOpacity(0.0),
+                //                 Colors.white.withOpacity(
+                //                   0.0,
+                //                 ), // Stays pitch black across the sides
+                //                 Colors.white.withOpacity(
+                //                   0.12,
+                //                 ), // Bottom-right flare
+                //                 Colors.white.withOpacity(0.0),
+                //                 Colors.white.withOpacity(0.0),
+                //               ],
+                //               // 🔹 Pinched the stops tightly to create the classic narrow "Bowtie" shape
+                //               stops: const [
+                //                 0.0,
+                //                 0.12, // Peak of top-left bowtie
+                //                 0.25, // Fades completely to dark
+                //                 0.50, // Holds dark
+                //                 0.62, // Peak of bottom-right bowtie
+                //                 0.75, // Fades completely to dark
+                //                 1.0,
+                //               ],
+                //             ),
+                //           ),
+                //         ),
+                //       ),
+                //     ),
+                //   ),
+                // ),
 
                 // ==========================================
                 // 3. 🔹 THE SPINNING ALBUM ART (Sandwiched on top of glare)
@@ -687,6 +705,34 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
       ),
     );
   }
+}
+
+class VinylGlarePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Inflate slightly so the light reaches the edge before blurring
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height).inflate(10);
+
+    // 1. Raw top-left glare (No mask filter!)
+    final Paint topFlarePaint = Paint()
+      ..color = Colors.white.withOpacity(0.20)
+      ..style = PaintingStyle.fill;
+
+    // 2. Raw bottom-right glare (No mask filter!)
+    final Paint bottomFlarePaint = Paint()
+      ..color = Colors.white.withOpacity(0.10)
+      ..style = PaintingStyle.fill;
+
+    const double sweepAngle = math.pi / 4;
+    const double topStartAngle = (-3 * math.pi / 4) - (sweepAngle / 2);
+    const double bottomStartAngle = (math.pi / 4) - (sweepAngle / 2);
+
+    canvas.drawArc(rect, topStartAngle, sweepAngle, true, topFlarePaint);
+    canvas.drawArc(rect, bottomStartAngle, sweepAngle, true, bottomFlarePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class CassetteTapePlayer extends StatefulWidget {

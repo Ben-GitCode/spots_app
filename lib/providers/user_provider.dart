@@ -61,4 +61,11 @@ class UserProvider extends ChangeNotifier {
     _currentUser = null;
     notifyListeners();
   }
+
+  Future<void> logout() async {
+    final supabase = Supabase.instance.client;
+    await supabase.auth.signOut(); // 🔥 clears session
+    _currentUser = null;
+    notifyListeners(); // 🔥 updates UI
+  }
 }
