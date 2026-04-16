@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'achievements_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:spots_app/providers/user_provider.dart';
+import 'settings_screen.dart';
+import '../utils/moment_data.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileScreen extends StatelessWidget {
   final int worldPercentage;
@@ -24,171 +27,271 @@ class ProfileScreen extends StatelessWidget {
 
   // Basic structure of the profile screen with header, stats, collections, and photo grid
   @override
-  Widget build(BuildContext context) {
-    final userProvider = Provider.of<UserProvider>(context);
-    final user = userProvider.currentUser;
+Widget build(BuildContext context) {
+  final userProvider = Provider.of<UserProvider>(context);
+  final user = userProvider.currentUser;
 
-    // If user is null, show a loading spinner or placeholder
-    if (user == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-  return Stack(
-    clipBehavior: Clip.none,
-    children: [
-      // --- THE WHITE SHEET (Locked in place) ---
-      Container(
-        margin: const EdgeInsets.only(top: 45),
-        decoration: const BoxDecoration(
-          color: const Color(0xFFFBFBF2),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-        ),
-        child: ClipRRect( // Prevents photos from scrolling "outside" the rounded corners
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-          child: Column(
-            children: [
-              const SizedBox(height: 12), // Space above the line
-              Container(
-                width: 80,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: Colors.black26, // Subtly dark, looks like a standard UI handle
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              //const SizedBox(height: 2), // Space below the line
-              // Use Expanded so the CustomScrollView knows its boundaries
-              Expanded(
-                child: CustomScrollView(
-                  controller: scrollController,
-                  slivers: [
-                    // 1. Everything that SHOULD scroll away
-                    SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildNameHeader(user, context),
-                          const SizedBox(height: 15),
-                          _buildStatsAndPassport(context),
-                          const SizedBox(height: 20),
-                          _buildCollectionsSection(),
-                          const SizedBox(height: 20),
-                        ],
-                      ),
+  if (user == null) {
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  // Wrap the existing UI in a FutureBuilder to fetch moments
+  return FutureBuilder<List<Moment>>(
+    // --- START OF UPDATED FETCH LOGIC ---
+    future: Supabase.instance.client
+        .from('moments')
+        .select('*, location')
+        .eq('user_id', user.id)
+        .order('created_at', ascending: false)
+        .then((data) {
+          // 1. Debug: Check what Supabase is actually returning
+          print('Supabase Fetch for User: ${user.id}');
+          print('Raw Data Received: $data');
+
+          try {
+            final List<dynamic> listData = data as List<dynamic>;
+            
+            // 2. Map the data using our updated factory
+            final moments = listData.map((m) => Moment.fromMap(m)).toList();
+            
+            print('Successfully mapped ${moments.length} moments.');
+            return moments;
+          } catch (e) {
+            // 3. Catch mapping errors (e.g., if JSON structure is wrong)
+            print('Mapping Error: $e');
+            return []; 
+          }
+        }),
+    // --- END OF UPDATED FETCH LOGIC ---
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      final moments = snapshot.data ?? [];
+
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 45),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFBFBF2),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 80,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-
-                    // 2. The Sticky Sort & Filter Bar
-                    SliverPersistentHeader(
-                      pinned: true, // This locks it to the top of the sheet
-                      delegate: _StickyHeaderDelegate(
-                        child: Container(
-                          color: const Color(0xFFFBFBF2), // Opaque so grid hides behind it
+                  ),
+                  Expanded(
+                    child: CustomScrollView(
+                      controller: scrollController,
+                      slivers: [
+                        SliverToBoxAdapter(
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildSortFilterRow(),
-                              const Divider(height: 1, thickness: 1, indent: 20, endIndent: 20),
+                              _buildNameHeader(user, context),
+                              const SizedBox(height: 15),
+                              _buildStatsAndPassport(context),
+                              const SizedBox(height: 20),
+                              _buildCollectionsSection(),
+                              const SizedBox(height: 20),
                             ],
                           ),
                         ),
-                      ),
-                    ),
-
-                    // 3. The Photo Grid
-                    SliverPadding(
-                      padding: const EdgeInsets.all(10),
-                      sliver: SliverGrid(
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.75, // Adjusted to make the cards taller
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                border: Border.all(color: Colors.black87, width: 2),
-                                borderRadius: BorderRadius.circular(4), // Subtle rounding
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 6,
-                                    offset: const Offset(2, 4),
-                                  ),
-                                ],
-                              ),
-                              padding: const EdgeInsets.all(6), // The white border
+                        SliverPersistentHeader(
+                          pinned: true,
+                          delegate: _StickyHeaderDelegate(
+                            child: Container(
+                              color: const Color(0xFFFBFBF2),
                               child: Column(
                                 children: [
-                                  // The actual photo
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(2),
-                                      child: Image.network(
-                                        userPhotos[index],
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                      ),
-                                    ),
-                                  ),
-                                  // The "Chin" (the extra space at the bottom)
-                                  const SizedBox(height: 12), 
-                                  // Optional: Add a tiny bit of text or just empty space
-                                  Container(
-                                    height: 10, 
-                                    width: 40,
-                                    color: Colors.grey.withOpacity(0.05), // Mimics a faint caption area
-                                  ),
+                                  _buildSortFilterRow(),
+                                  const Divider(height: 1, thickness: 1, indent: 20, endIndent: 20),
                                 ],
                               ),
-                            );
-                          },
-                          childCount: userPhotos.length,
+                            ),
+                          ),
                         ),
-                      ),
+                        // --- UPDATED PHOTO GRID ---
+                        SliverPadding(
+                          padding: const EdgeInsets.all(10),
+                          sliver: moments.isEmpty
+                              ? const SliverToBoxAdapter(
+                                  child: Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(top: 40.0),
+                                      child: Text("No moments yet"),
+                                    ),
+                                  ),
+                                )
+                              : SliverGrid(
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 12,
+                                    childAspectRatio: 0.75,
+                                  ),
+                                  delegate: SliverChildBuilderDelegate(
+                                    (context, index) {
+                                      final moment = moments[index];
+
+                                      return Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          border: Border.all(color: Colors.black87, width: 2),
+                                          borderRadius: BorderRadius.circular(4),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.1),
+                                              blurRadius: 6,
+                                              offset: const Offset(2, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        padding: const EdgeInsets.all(6),
+                                        child: Column(
+                                          children: [
+                                            // --- MEDIA CONTENT AREA ---
+                                            Expanded(
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(2),
+                                                child: _buildMediaPreview(moment),
+                                              ),
+                                            ),
+                                            
+                                            const SizedBox(height: 12),
+                                            
+                                            // --- THE CHIN (Caption) ---
+                                            Text(
+                                              moment.text,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 8, 
+                                                color: Colors.black54,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                    childCount: moments.length,
+                                  ),
+                                ),
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Floating Profile Photo
+          Positioned(
+            top: 10,
+            left: 20,
+            child: GestureDetector(
+              onTap: () => _showProfileOptions(context, user),
+              child: Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.black87, width: 3),
+                  image: DecorationImage(
+                    fit: BoxFit.cover,
+                    image: NetworkImage(user.profilePictureUrl),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 12,
+                      color: Colors.black.withOpacity(0.15),
+                      offset: const Offset(0, 4),
                     )
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-
-      // Floating Profile Photo
-      Positioned(
-        top: 10,
-        left: 20,
-        child: GestureDetector(
-          onTap: () => _showProfileOptions(context),
-          child: Container(
-            width: 90,
-            height: 90,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.black87, width: 3),
-              image: DecorationImage(
-                image: NetworkImage(
-                  // Use the URL from your UserData class, with a fallback if it's null
-                  user.profilePictureUrl,
-                ),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 12,
-                  color: Colors.black.withOpacity(0.15),
-                  offset: const Offset(0, 4),
-                )
-              ],
             ),
           ),
-        ),
-      ),
-    ],
+        ],
+      );
+    },
   );
 }
 
+  Future<List<Moment>> getUserMoments(String currentUserId) async {
+    final List<dynamic> response = await Supabase.instance.client
+        .from('moments')
+        .select()
+        .eq('user_id', currentUserId)
+        .order('created_at', ascending: false);
+
+    // Convert the raw data into Moment objects
+    return response.map((data) => Moment.fromMap(data)).toList();
+  }
+
+  Widget _buildMediaPreview(Moment moment) {
+    // Check for image types
+    if (moment.mediaType.toLowerCase() == 'photo' || moment.mediaType.toLowerCase() == 'image') {
+      return Image.network(
+        moment.mediaURL,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        // Fallback if the image fails to load
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: Colors.grey[200],
+          child: const Icon(Icons.broken_image, color: Colors.black26),
+        ),
+      );
+    } 
+    
+    // Check for audio/music types
+    else if (moment.mediaType.toLowerCase() == 'sound' || moment.mediaType.toLowerCase() == 'music') {
+      return Container(
+        width: double.infinity,
+        color: const Color(0xFFEEEEEE), // Light grey placeholder
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.music_note_rounded,
+              size: 32,
+              color: Colors.black87,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "AUDIO",
+              style: TextStyle(
+                fontSize: 7, 
+                letterSpacing: 1, 
+                color: Colors.black.withOpacity(0.4),
+                fontWeight: FontWeight.bold
+              ),
+            )
+          ],
+        ),
+      );
+    }
+
+  // Fallback for any other type
+  return Container(
+    color: Colors.grey[100],
+    child: const Icon(Icons.more_horiz, color: Colors.black26),
+  );
+}
   // The header with the username, aligned to the right of the profile photo
   Widget _buildNameHeader(final user, BuildContext context) {
     return Padding(
@@ -222,9 +325,12 @@ class ProfileScreen extends StatelessWidget {
             icon: const Icon(Icons.settings, size: 20),
             color: Colors.black87,
             onPressed: () {
-              context.read<UserProvider>().logout();
-              // TODO: Navigate to Settings
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
             },
+
           ),
         ],
       ),
@@ -267,7 +373,8 @@ class ProfileScreen extends StatelessWidget {
   }
   
   // Profile Picture Options Pop-up
-  void _showProfileOptions(BuildContext context) {
+  void _showProfileOptions(BuildContext context, user) {
+  
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -276,12 +383,11 @@ class ProfileScreen extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
-              mainAxisSize: MainAxisSize.min, // Constrains the box to its content
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Stack(
                   alignment: Alignment.bottomRight,
                   children: [
-                    // The "larger" profile image
                     Container(
                       width: 150,
                       height: 150,
@@ -289,30 +395,54 @@ class ProfileScreen extends StatelessWidget {
                         color: Color(0xFF91A1E8),
                         shape: BoxShape.circle,
                       ),
-                      child: const Center(
-                        child: Text("t", style: TextStyle(fontSize: 80, color: Colors.white)),
+                      child: ClipOval(
+                        child: Image.network(
+                          user.profilePictureUrl,
+                          fit: BoxFit.cover,
+                          // This handles the loading state
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            );
+                          },
+                          // In case of a 404 or no internet, show the "t"
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Text(
+                                "t",
+                                style: TextStyle(fontSize: 80, color: Colors.white),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
-                    // The Edit Pencil Button
-                  Positioned(
-                    bottom: 5,
-                    right: 5,
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.pop(context); 
-                        _showPickerOptions(context); 
-                      },
-                      child: const CircleAvatar(
-                        backgroundColor: Colors.white,
-                        radius: 20,
-                        child: Icon(Icons.edit, color: Color(0xFF91A1E8)),
+                    Positioned(
+                      bottom: 5,
+                      right: 5,
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.pop(context); 
+                          _showPickerOptions(context); 
+                        },
+                        child: const CircleAvatar(
+                          backgroundColor: Colors.white,
+                          radius: 20,
+                          child: Icon(Icons.edit, color: Color(0xFF91A1E8)),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const Text("Profile Photo", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Profile Photo", 
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
               ],
             ),
           ),

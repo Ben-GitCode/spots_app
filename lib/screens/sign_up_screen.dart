@@ -46,7 +46,7 @@ class _CreateUserScreenState extends State<CreateUserScreen> {
         // 2. Initialize the UserData object with the info we just typed
         // We use a temporary default image since they haven't reached the upload screen yet
         final newUser = UserData(
-          userID: user.id,
+          id: user.id,
           username: nameController.text.trim(),
           profilePictureUrl: "https://nyprkwgliwnyktcqsfsf.supabase.co/storage/v1/object/public/profile_pictures/wanderercreative-blank-profile-picture-973460_640.png", 
           dataJoined: DateTime.now(),

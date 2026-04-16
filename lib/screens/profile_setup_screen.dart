@@ -90,7 +90,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       // 3. Initialize your UserData class
       // Note: 'user.userMetadata' contains the name from the Signup screen
       final newUserData = UserData(
-        userID: user!.id,
+        id: user!.id,
         username: username,
         profilePictureUrl: imageUrl,
         dataJoined: DateTime.now(),
