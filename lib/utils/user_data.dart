@@ -3,7 +3,7 @@ import 'collection_data.dart';
 import 'moment_data.dart';
 
 class UserData {
-  final String userID;
+  final String id;
   final String username;
   final String profilePictureUrl;
   final DateTime dataJoined; 
@@ -14,7 +14,7 @@ class UserData {
   final List<Stamp> userStamps; 
 
   UserData({
-    required this.userID,
+    required this.id,
     required this.profilePictureUrl,
     required this.dataJoined,
     required this.worldPercentage,
@@ -27,7 +27,7 @@ class UserData {
 
   factory UserData.fromJson(Map<String, dynamic> json) {
     return UserData(
-      userID: json['id'] ?? '', 
+      id: json['id'] ?? '', 
       username: json['username'] ?? 'Explorer', 
       profilePictureUrl: json['profile_picture'] ?? '',
       // For now, we "mock" the data you haven't built yet:

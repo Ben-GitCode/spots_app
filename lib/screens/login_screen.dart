@@ -38,9 +38,9 @@ class _LoginScreenState extends State<LoginScreen> {
         // We use listen: false because we are in a function, not a build method
         await Provider.of<UserProvider>(context, listen: false).refreshUser();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Logged in successfully!')),
-        );
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   const SnackBar(content: Text('Logged in successfully!')),
+        // );
 
         // 👉 Move to your map screen
         Navigator.pushReplacement(

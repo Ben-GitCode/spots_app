@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../screens/login_screen.dart';
 import '../screens/map_screen.dart';
 import '../screens/onboarding_screen.dart';
 
@@ -19,6 +18,6 @@ class AuthGate extends StatelessWidget {
 
     // Otherwise, show the Login screen
     //return const LoginScreen();
-    return const LoginScreen();
+    return const SpotsOnboardingScreen();
   }
 }
