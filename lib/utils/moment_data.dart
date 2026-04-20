@@ -1,65 +1,82 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:spots_app/utils/models.dart';
+import 'package:spots_app/media_widgets/moment_media_blocks.dart';
 
 class Moment {
-  final String momentID;
-  final String ownerID;
-  final String text; 
-  final String mediaURL; 
-  final String mediaType; // Added mediaType field
+  final String id;
+  final String spotId; // 🔹 NEW: Used to navigate back to the Spot
+  final String authorId; // 🔹 NEW: Used to navigate to the User Profile
+  final String authorName;
+  final String avatarUrl;
+  final DateTime timestamp;
+  final MomentMedia media;
+  final String caption;
+  final Map<SpotReactions, int> reactionCounts;
+  final int commentCount;
   final LatLng location;
-  final DateTime dateCreated;
+
+  SpotReactions? userReaction;
 
   Moment({
-    required this.momentID,
-    required this.ownerID,
-    required this.text,
-    required this.mediaURL,
-    required this.mediaType, // Required in constructor
+    required this.id,
+    required this.spotId,
+    required this.authorId,
+    required this.authorName,
+    required this.avatarUrl,
+    required this.timestamp,
+    required Map<String, dynamic>? payload,
+    required this.reactionCounts,
     required this.location,
-    required this.dateCreated,
-  });
+    this.caption = "",
+    this.commentCount = 0,
+    this.userReaction,
+  }) : media = MomentMedia.fromData(payload, caption);
 
+  // --- LOGIC: AGGREGATE REACTIONS ---
+  int get totalReactions =>
+      reactionCounts.values.fold(0, (sum, val) => sum + val);
+
+  List<SpotReactions> get top3Reactions {
+    var sortedEntries = reactionCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sortedEntries.take(3).map((e) => e.key).toList();
+  }
+
+  // --- SUPABASE PARSER ---
   factory Moment.fromMap(Map<String, dynamic> map) {
-  // --- 1. Extract Media ---
-  final payload = map['media_payload'];
-  String url = '';
-  String type = 'photo';
+    // 1. Grab the raw payload exactly as it is in the database (null is fine!)
+    final payload = map['media_payload'];
+    final String caption = map['caption'] ?? '';
 
-  if (payload is Map<String, dynamic>) {
-    // For music, you might want the album art as the preview
-    type = payload['type'] ?? 'photo';
-    url = (type == 'music' || type == 'sound') 
-        ? (payload['album_art'] ?? '') 
-        : (payload['url'] ?? '');
+    // 2. Extract Location
+    final locData = map['location'];
+    double lat = 0.0;
+    double lng = 0.0;
+    if (locData is Map && locData.containsKey('coordinates')) {
+      List coords = locData['coordinates'];
+      lng = coords[0].toDouble();
+      lat = coords[1].toDouble();
+    }
+
+    // 3. Extract joined profile data
+    final profile = map['users'] ?? {};
+    Map<SpotReactions, int> parsedReactions = {};
+
+    return Moment(
+      id: map['id'].toString(),
+      spotId: map['spot_id']?.toString() ?? '',
+      authorId: map['user_id']?.toString() ?? '',
+      authorName: profile['username'] ?? 'Unknown User',
+      avatarUrl: profile['profile_picture'] ?? 'https://i.pravatar.cc/150',
+      timestamp: map['created_at'] != null
+          ? DateTime.parse(map['created_at'])
+          : DateTime.now(),
+      payload: payload, // 🔹 Passes raw payload (might be null)
+      caption: caption, // 🔹 Passes SQL caption
+      location: LatLng(lat, lng),
+      commentCount: map['comment_count'] ?? 0,
+      reactionCounts: parsedReactions,
+    );
   }
-
-  // --- 2. Extract Location (Handling PostGIS Geography) ---
-  final locData = map['location'];
-  double lat = 0.0;
-  double lng = 0.0;
-
-  if (locData is Map && locData.containsKey('coordinates')) {
-    // GeoJSON format: [longitude, latitude]
-    List coords = locData['coordinates'];
-    lng = coords[0].toDouble();
-    lat = coords[1].toDouble();
-  } else if (locData is String) {
-    // This catches that hex string so the app doesn't crash, 
-    // even if it can't plot the point yet.
-    print("Warning: Location is still a hex string. Query for 'location' as GeoJSON.");
-  }
-
-  return Moment(
-    momentID: map['id'].toString(),
-    ownerID: map['user_id'].toString(),
-    text: map['caption'] ?? '',
-    mediaURL: url,
-    mediaType: type,
-    location: LatLng(lat, lng),
-    dateCreated: map['created_at'] != null 
-        ? DateTime.parse(map['created_at']) 
-        : DateTime.now(),
-  );
-}
 }

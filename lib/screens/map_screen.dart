@@ -284,13 +284,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-     final userProvider = Provider.of<UserProvider>(context);
-      final user = userProvider.currentUser;
+    final userProvider = Provider.of<UserProvider>(context);
+    final user = userProvider.currentUser;
 
-      // If user is null, show a loading spinner or placeholder
-      if (user == null) {
-        return const Center(child: CircularProgressIndicator());
-      }
+    // If user is null, show a loading spinner or placeholder
+    if (user == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return Scaffold(
       body: FutureBuilder<Directory>(
@@ -440,7 +440,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ),
 
               /// 4. BOTTOM TOOLBAR
-              Positioned(bottom: 20, left: 0, right: 0, child: _buildToolbar(user)),
+              Positioned(
+                bottom: 20,
+                left: 0,
+                right: 0,
+                child: _buildToolbar(user),
+              ),
             ],
           );
         },
@@ -588,7 +593,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => SpotDisplayScreen(spotTitle: spot.title),
+                      builder: (_) => SpotDisplayScreen(
+                        spotId: spot.id,
+                        spotTitle: spot.title,
+                      ),
                     ),
                   );
                 },
