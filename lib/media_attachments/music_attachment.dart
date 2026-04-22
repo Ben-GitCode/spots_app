@@ -13,6 +13,8 @@ class MusicTrack {
   final String artUrl;
   final String? previewUrl;
   final String externalUrl;
+  final int? collectionId;
+  final int? trackId;
 
   MusicTrack({
     required this.id,
@@ -21,6 +23,8 @@ class MusicTrack {
     required this.artUrl,
     this.previewUrl,
     required this.externalUrl,
+    this.collectionId,
+    this.trackId,
   });
 }
 
@@ -70,7 +74,7 @@ class MusicAttachment extends MediaAttachment {
   Future<void> _performSearch(String query) async {
     try {
       final url = Uri.parse(
-        'https://itunes.apple.com/search?term=${Uri.encodeComponent(query)}&entity=song&limit=10',
+        'https://itunes.apple.com/search?term=${Uri.encodeComponent(query)}&entity=song&limit=10&country=US',
       );
 
       final response = await http.get(url);
@@ -79,21 +83,59 @@ class MusicAttachment extends MediaAttachment {
         final data = json.decode(response.body);
         final List results = data['results'] ?? [];
 
-        searchResults = results
-            .map(
-              (track) => MusicTrack(
-                id: track['trackId'].toString(),
-                title: track['trackName'] ?? 'Unknown',
-                artist: track['artistName'] ?? 'Unknown',
-                artUrl: (track['artworkUrl100'] as String).replaceAll(
-                  '100x100bb',
-                  '600x600bb',
-                ),
-                previewUrl: track['previewUrl'],
-                externalUrl: track['trackViewUrl'],
-              ),
-            )
-            .toList();
+        searchResults = results.map((track) {
+          final int? trackId = track['trackId'];
+          final int? collectionId = track['collectionId'];
+
+          String externalUrl = '';
+
+          // Prefer the exact trackViewUrl from iTunes
+          if (track['trackViewUrl'] != null) {
+            externalUrl = track['trackViewUrl'].toString();
+
+            // Convert old iTunes links to Apple Music links
+            externalUrl = externalUrl.replaceFirst(
+              'https://itunes.apple.com/',
+              'https://music.apple.com/',
+            );
+
+            // Force US storefront
+            externalUrl = externalUrl.replaceAll(
+              RegExp(r'music\.apple\.com/[a-z]{2}/'),
+              'music.apple.com/us/',
+            );
+          }
+
+          // If the URL still does not contain ?i= and we have IDs,
+          // rebuild it into a more Odesli-friendly track URL
+          if (!externalUrl.contains('?i=') &&
+              trackId != null &&
+              collectionId != null) {
+            externalUrl =
+                'https://music.apple.com/us/album/id$collectionId?i=$trackId';
+          }
+
+          debugPrint('Track: ${track['trackName']}');
+          debugPrint('Original trackViewUrl: ${track['trackViewUrl']}');
+          debugPrint('Final externalUrl: $externalUrl');
+
+          return MusicTrack(
+            id: trackId?.toString() ?? UniqueKey().toString(),
+            title: track['trackName'] ?? 'Unknown',
+            artist: track['artistName'] ?? 'Unknown',
+            artUrl: (track['artworkUrl100'] as String).replaceAll(
+              '100x100bb',
+              '600x600bb',
+            ),
+            previewUrl: track['previewUrl'],
+            externalUrl: externalUrl,
+            collectionId: collectionId,
+            trackId: trackId,
+          );
+        }).toList();
+      } else {
+        debugPrint('iTunes search failed: ${response.body}');
+        searchResults = [];
       }
     } catch (e) {
       debugPrint("Search error: $e");

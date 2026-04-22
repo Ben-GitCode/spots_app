@@ -8,10 +8,12 @@ import 'package:spots_app/media_attachments/camera_attachment.dart';
 import 'package:spots_app/media_attachments/audio_attachment.dart';
 import 'package:spots_app/media_attachments/music_attachment.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:latlong2/latlong.dart';
+//import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:geocoding/geocoding.dart';
+import 'package:lat_lng_to_timezone/lat_lng_to_timezone.dart' as tzmap;
 
 //enum MediaType { text, camera, audio, music, poll, gallery }
 
@@ -148,15 +150,27 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
 
   bool _isReadyToCapture() {
     bool textReady = _textController.text.trim().isNotEmpty;
-    bool mediaReady = _activeAttachment?.isValid ?? false;
 
+    // IF AN ATTACHMENT IS ACTIVE:
     if (_activeAttachment != null) {
+      bool mediaReady = _activeAttachment!.isValid;
+
+      // 1. Hard Block: If the attachment is not finished (e.g. still recording),
+      // completely disable the button.
+      if (!mediaReady) return false;
+
+      // 2. If the attachment is finished, check if it strictly requires text
+      // (like a Poll needing a question).
       if (_activeAttachment!.requiresText) {
-        return textReady && mediaReady;
+        return textReady;
       }
-      return textReady || mediaReady;
+
+      // 3. If it's finished and doesn't require text (Audio, Photo, Music), you are good!
+      return true;
     }
 
+    // IF NO ATTACHMENT:
+    // They must have written some text.
     return textReady;
   }
 
@@ -175,7 +189,54 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
+      // ==========================================
+      // 🔹 UPGRADED: RICH JSON LOCATION DATA
+      // ==========================================
+      Map<String, dynamic> addressJson = {
+        'status': 'unknown', // Fallback status
+      };
+
+      // Gather Geocoded Address
+      try {
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+
+          // Pack every available field into the map
+          addressJson = {
+            'status': 'success',
+            'name': place.name ?? '', // E.g., "12" or "Azrieli Center"
+            'street': place.street ?? '', // E.g., "Sokolov St 12"
+            'thoroughfare': place.thoroughfare ?? '', // E.g., "Sokolov Street"
+            'sub_thoroughfare': place.subThoroughfare ?? '', // E.g., "12"
+            'locality': place.locality ?? '', // City (e.g., "Herzliya")
+            'sub_locality': place.subLocality ?? '', // Neighborhood
+            'sub_admin_area':
+                place.subAdministrativeArea ?? '', // District/County
+            'admin_area': place.administrativeArea ?? '', // State/Province
+            'postal_code': place.postalCode ?? '',
+            'country': place.country ?? '', // E.g., "Israel"
+            'iso_country_code': place.isoCountryCode ?? '', // E.g., "IL"
+          };
+        }
+      } catch (e) {
+        debugPrint("Geocoding silently failed: $e");
+        addressJson = {'status': 'error', 'error_message': e.toString()};
+      }
+
+      // Gather Spoof-Proof Timezone
+      String timezone = tzmap.latLngToTimezoneString(
+        position.latitude,
+        position.longitude,
+      );
+      // ==========================================
+
       Map<String, dynamic>? finalMediaPayload = null;
+      String finalCaption = "";
 
       if (_activeAttachment != null) {
         final rawJson = Map<String, dynamic>.from(_activeAttachment!.toJson());
@@ -237,7 +298,7 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
               }
             }
 
-            // --- 3. BUILD THE JSON PAYLOAD ---
+            // --- 3. BUILD THE JSON PAYLOAD & CAPTION ---
             if (type == 'audio') {
               finalMediaPayload = {
                 'type': 'audio',
@@ -254,63 +315,194 @@ class _CreateMomentScreenState extends State<CreateMomentScreen> {
                 finalMediaPayload['thumbnail_url'] = thumbnailUrl;
               }
             }
+            finalCaption = _textController.text.trim();
           }
         } else if (type == 'music') {
-          // --- ODESLI API INTEGRATION ---
-          final String originalUrl = rawJson['url'];
-          final encodedUrl = Uri.encodeComponent(originalUrl);
+          // --- 1. DEFAULT FALLBACK PAYLOAD (Using pristine iTunes data) ---
+          final String title = rawJson['title'] ?? 'Unknown Title';
+          final String artist = rawJson['artist'] ?? 'Unknown Artist';
+          final String itunesUrl = rawJson['url'] ?? '';
 
-          final odesliRes = await http.get(
-            Uri.parse('https://api.song.link/v1-alpha.1/links?url=$encodedUrl'),
-          );
+          // We build this immediately. If anything below fails, the Moment still posts!
+          finalMediaPayload = {
+            'type': 'music',
+            'song_title': title,
+            'artist': artist,
+            'album_art': rawJson['art_url'] ?? '',
+            'preview_url':
+                rawJson['preview_url'] ?? '', // Keeps iTunes playable audio!
+            'platform_links': {'Apple Music': itunesUrl},
+          };
+          finalCaption = _textController.text.trim();
 
-          if (odesliRes.statusCode == 200) {
-            final odesliData = json.decode(odesliRes.body);
-            final entityUniqueId = odesliData['entityUniqueId'];
-            final entitiesByUniqueId = odesliData['entitiesByUniqueId'];
-            final linksByPlatform = odesliData['linksByPlatform'];
+          // --- 2. THE DEEZER BRIDGE ---
+          try {
+            final String searchQuery = Uri.encodeComponent('$title $artist');
+            final deezerSearchUrl = Uri.parse(
+              'https://api.deezer.com/search?q=$searchQuery&limit=1',
+            );
 
-            final primaryEntity = entitiesByUniqueId[entityUniqueId];
+            final deezerRes = await http
+                .get(deezerSearchUrl)
+                .timeout(const Duration(seconds: 4));
+            String? universalUrl;
 
-            Map<String, String> platformLinks = {};
-            if (linksByPlatform.containsKey('spotify'))
-              platformLinks['Spotify'] = linksByPlatform['spotify']['url'];
-            if (linksByPlatform.containsKey('appleMusic'))
-              platformLinks['Apple Music'] =
-                  linksByPlatform['appleMusic']['url'];
-            if (linksByPlatform.containsKey('youtubeMusic'))
-              platformLinks['YouTube Music'] =
-                  linksByPlatform['youtubeMusic']['url'];
+            if (deezerRes.statusCode == 200) {
+              final deezerData = json.decode(deezerRes.body);
+              if (deezerData['data'] != null && deezerData['data'].isNotEmpty) {
+                universalUrl = deezerData['data'][0]['link'];
+              }
+            }
 
-            finalMediaPayload = {
-              'type': 'music',
-              'song_title': primaryEntity['title'] ?? 'Unknown Title',
-              'artist': primaryEntity['artistName'] ?? 'Unknown Artist',
-              'album_art': primaryEntity['thumbnailUrl'] ?? '',
-              'preview_url': originalUrl,
-              'platform_links': platformLinks,
-            };
-          } else {
-            throw Exception("Could not fetch song data from Odesli.");
+            final lookupUrl = universalUrl ?? itunesUrl;
+            final encodedUrl = Uri.encodeComponent(lookupUrl);
+
+            // --- 3. ATTEMPT ODESLI UPGRADE ---
+            final odesliRes = await http
+                .get(
+                  Uri.parse(
+                    'https://api.song.link/v1-alpha.1/links?url=$encodedUrl&userCountry=US',
+                  ),
+                )
+                .timeout(const Duration(seconds: 5));
+
+            if (odesliRes.statusCode == 200) {
+              final odesliData = json.decode(odesliRes.body);
+              final linksByPlatform = odesliData['linksByPlatform'] ?? {};
+
+              Map<String, String> platformLinks = {};
+              final supportedPlatforms = {
+                'spotify': 'Spotify',
+                'appleMusic': 'Apple Music',
+                'youtubeMusic': 'YouTube Music',
+                'youtube': 'YouTube',
+                'amazonMusic': 'Amazon Music',
+                'pandora': 'Pandora',
+                'audiomack': 'Audiomack',
+                'soundcloud': 'SoundCloud',
+                'tidal': 'Tidal',
+                'deezer': 'Deezer',
+              };
+
+              // Grab whatever exact links Odesli managed to find
+              supportedPlatforms.forEach((apiKey, displayName) {
+                final platformData = linksByPlatform[apiKey];
+                if (platformData != null &&
+                    platformData['url'] != null &&
+                    platformData['url'].toString().isNotEmpty) {
+                  platformLinks[displayName] = platformData['url'];
+                }
+              });
+
+              // ==========================================
+              // 🔹 4. THE ULTIMATE FAILSAFE: SMART DEEP LINKS
+              // ==========================================
+              // If Odesli dropped the ball on the big platforms, we build native search links!
+              final String urlQuery = Uri.encodeComponent('$title $artist');
+
+              if (!platformLinks.containsKey('Spotify')) {
+                platformLinks['Spotify'] =
+                    'https://open.spotify.com/search/$urlQuery';
+              }
+              if (!platformLinks.containsKey('YouTube Music')) {
+                platformLinks['YouTube Music'] =
+                    'https://music.youtube.com/search?q=$urlQuery';
+              }
+              if (!platformLinks.containsKey('YouTube')) {
+                platformLinks['YouTube'] =
+                    'https://www.youtube.com/results?search_query=$urlQuery';
+              }
+              // Always ensure Apple Music is there just in case Odesli missed it
+              if (!platformLinks.containsKey('Apple Music')) {
+                platformLinks['Apple Music'] = itunesUrl;
+              }
+              // ==========================================
+
+              // SUCCESS! OVERWRITE THE LINKS (But keep iTunes audio/art!)
+              finalMediaPayload['platform_links'] = platformLinks;
+            }
+          } catch (e) {
+            // SILENT FAIL: If no internet or Odesli is down, the app won't crash.
+            debugPrint(
+              "Cross-platform fetch failed, falling back to pure iTunes data: $e",
+            );
           }
+
+          // else if (type == 'music') {
+          //   // --- ODESLI API INTEGRATION ---
+          //   final String originalUrl = rawJson['url'];
+          //   final encodedUrl = Uri.encodeComponent(originalUrl);
+
+          //   final odesliRes = await http.get(
+          //     Uri.parse('https://api.song.link/v1-alpha.1/links?url=$encodedUrl'),
+          //   );
+
+          //   if (odesliRes.statusCode == 200) {
+          //     final odesliData = json.decode(odesliRes.body);
+          //     final entityUniqueId = odesliData['entityUniqueId'];
+          //     final entitiesByUniqueId = odesliData['entitiesByUniqueId'];
+          //     final linksByPlatform = odesliData['linksByPlatform'];
+
+          //     final primaryEntity = entitiesByUniqueId[entityUniqueId];
+
+          //     Map<String, String> platformLinks = {};
+          //     if (linksByPlatform.containsKey('spotify')) {
+          //       platformLinks['Spotify'] = linksByPlatform['spotify']['url'];
+          //     }
+          //     if (linksByPlatform.containsKey('appleMusic')) {
+          //       platformLinks['Apple Music'] =
+          //           linksByPlatform['appleMusic']['url'];
+          //     }
+          //     if (linksByPlatform.containsKey('youtubeMusic')) {
+          //       platformLinks['YouTube Music'] =
+          //           linksByPlatform['youtubeMusic']['url'];
+          //     }
+
+          //     finalMediaPayload = {
+          //       'type': 'music',
+          //       'song_title': primaryEntity['title'] ?? 'Unknown Title',
+          //       'artist': primaryEntity['artistName'] ?? 'Unknown Artist',
+          //       'album_art': primaryEntity['thumbnailUrl'] ?? '',
+          //       'preview_url': originalUrl,
+          //       'platform_links': platformLinks,
+          //     };
+          //     finalCaption = _textController.text.trim();
+          //   } else {
+          //     throw Exception("Could not fetch song data from Odesli.");
+          //   }
         } else if (type == 'poll') {
           // --- POLL DATA ---
-          finalMediaPayload = {'type': 'poll', 'options': rawJson['options']};
+          finalMediaPayload = {
+            'type': 'poll',
+            'question': _textController.text
+                .trim(), // 🔹 Text becomes the question
+            'options': rawJson['options'],
+          };
+          finalCaption = "";
         }
+      } else {
+        // 🔹 NO ATTACHMENT: TEXT ONLY
+        finalMediaPayload = {
+          'type': 'text',
+          'text': _textController.text.trim(), // 🔹 Text goes straight to JSON
+        };
+        finalCaption = ""; // 🔹 SQL caption stays empty
       }
 
       // 4. THE RPC CALL
       await supabase.rpc(
         'create_moment_with_spot',
         params: {
-          'p_caption': _textController.text.trim(),
+          'p_caption': finalCaption,
           'p_media_payload': finalMediaPayload,
           'p_lat': position.latitude,
           'p_lng': position.longitude,
+          'p_address': addressJson, // 🔹 Passes the full JSON map
+          'p_timezone': timezone,
         },
       );
 
-      debugPrint("Successfully created moment!");
+      debugPrint("Successfully created moment in $timezone!");
 
       HapticFeedback.lightImpact();
       if (mounted) Navigator.pop(context, true);

@@ -150,9 +150,17 @@ class _SpotDisplayScreenState extends State<SpotDisplayScreen> {
             ascending: true,
           ); // Chronological order for the timeline
 
-      List<Moment> fetchedMoments = (response as List)
-          .map((data) => Moment.fromMap(data))
-          .toList();
+      List<Moment> fetchedMoments = [];
+
+      for (var data in response as List) {
+        try {
+          fetchedMoments.add(Moment.fromMap(data));
+        } catch (innerError) {
+          // If a single moment is corrupted (e.g., null payload),
+          // it gets caught here and skipped, saving the rest of the Spot!
+          debugPrint("🚨 Skipped corrupted moment: $innerError");
+        }
+      }
 
       // Initialize the controllers to the most recent moment (the end of the list)
       if (fetchedMoments.isNotEmpty) {

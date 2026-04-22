@@ -472,6 +472,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  font_awesome_flutter:
+    dependency: "direct main"
+    description:
+      name: font_awesome_flutter
+      sha256: "09dcde8ab90ffae1a7d65ff2ef96fc62a17ad9d0ce7c127b317ded676b0d5935"
+      url: "https://pub.dev"
+    source: hosted
+    version: "11.0.0"
   functions_client:
     dependency: transitive
     description:
@@ -480,6 +488,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.5.0"
+  geocoding:
+    dependency: "direct main"
+    description:
+      name: geocoding
+      sha256: "606be036287842d779d7ec4e2f6c9435fc29bbbd3c6da6589710f981d8852895"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.0"
+  geocoding_android:
+    dependency: transitive
+    description:
+      name: geocoding_android
+      sha256: ba810da90d6633cbb82bbab630e5b4a3b7d23503263c00ae7f1ef0316dcae5b9
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.0.1"
+  geocoding_ios:
+    dependency: transitive
+    description:
+      name: geocoding_ios
+      sha256: "18ab1c8369e2b0dcb3a8ccc907319334f35ee8cf4cfef4d9c8e23b13c65cb825"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.0"
+  geocoding_platform_interface:
+    dependency: transitive
+    description:
+      name: geocoding_platform_interface
+      sha256: "8c2c8226e5c276594c2e18bfe88b19110ed770aeb7c1ab50ede570be8b92229b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.0"
   geolocator:
     dependency: "direct main"
     description:
@@ -728,6 +768,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.1"
+  lat_lng_to_timezone:
+    dependency: "direct main"
+    description:
+      name: lat_lng_to_timezone
+      sha256: "149db00299362dd756271fd9c936e533618811214c130ca77ebfa3ccdfc6a593"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
   latlong2:
     dependency: "direct main"
     description:
@@ -1160,6 +1208,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.4.1"
+  simple_icons:
+    dependency: "direct main"
+    description:
+      name: simple_icons
+      sha256: "2ca3cd79c9f12e97a8588cae0f342609f19fd2e82315356cb09b5c4987ad0808"
+      url: "https://pub.dev"
+    source: hosted
+    version: "14.6.1"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -1253,6 +1309,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.10"
+  text_scroll:
+    dependency: "direct main"
+    description:
+      name: text_scroll
+      sha256: "164b49e6134fca874989213d4e7ba225e2c3f9e30d9e32f14d543b2fc55716a0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.1"
   transparent_image:
     dependency: transitive
     description:

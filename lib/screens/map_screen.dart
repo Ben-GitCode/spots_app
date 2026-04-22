@@ -10,12 +10,15 @@ import 'package:path_provider/path_provider.dart';
 import 'package:dio_cache_interceptor_file_store/dio_cache_interceptor_file_store.dart';
 import 'package:spots_app/screens/spot_display_screen.dart';
 import 'package:spots_app/components/overlapping_reaction_stack.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // 🔹 Imported Supabase!
 import 'dart:io';
 import 'dart:async';
 
 import 'profile_screen.dart';
 import 'create_moment_screen.dart';
 import 'package:spots_app/utils/models.dart';
+import 'package:spots_app/utils/spot_data.dart'; // 🔹 Spot class
+import 'package:spots_app/utils/moment_data.dart'; // 🔹 Moment class
 import 'package:flutter_svg/flutter_svg.dart';
 import 'traces_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -27,6 +30,7 @@ import 'edge_function_test_screen.dart';
 
 import 'package:spots_app/providers/user_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -40,28 +44,31 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final String mapTilerAPIKey = dotenv.env['MAPTILER_KEY']!;
   bool _profileOpen = false;
 
-  // 🔹 Streams to control the "Lock-on" behavior
   late AlignOnUpdate _alignPositionOnUpdate;
   late final StreamController<double?> _alignPositionStreamController;
 
   bool _hasPermissions = false;
 
-  // Future for the cache store to ensure it's ready before the map builds
   late Future<Directory> _cacheDir;
 
-  // 🔹 1. NEW VARIABLES FOR PROXIMITY MATH
   LatLng? _currentLocation;
   StreamSubscription<Position>? _positionStreamSubscription;
+
+  // 🔹 LIVE DATA VARIABLES
+  List<Spot> _spots = [];
+  Spot? _selectedSpot;
+  bool _isMoving = false;
 
   @override
   void initState() {
     super.initState();
-    _cacheDir = getTemporaryDirectory(); // Get a place to store tiles
+    _cacheDir = getTemporaryDirectory();
 
-    // 🔹 Initialize location tracking streams
-    _alignPositionOnUpdate = AlignOnUpdate.always; // Start locked on
+    _alignPositionOnUpdate = AlignOnUpdate.always;
     _alignPositionStreamController = StreamController<double?>();
+
     _checkLocationPermissions();
+    _fetchSpots(); // 🔹 Fetch live spots on load!
   }
 
   @override
@@ -72,7 +79,26 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // 🔹 Permission Check Logic
+  // 🔹 FETCH FROM SUPABASE
+  Future<void> _fetchSpots() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('spots')
+          // 🔹 Ask for all normal columns (*), PLUS our new virtual columns!
+          .select('*, latitude, longitude');
+
+      if (mounted) {
+        setState(() {
+          _spots = (response as List)
+              .map((data) => Spot.fromJson(data))
+              .toList();
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching spots: $e");
+    }
+  }
+
   Future<void> _checkLocationPermissions() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -93,18 +119,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       return;
     }
 
-    // 🔹 THE HARD GATE: Check for Precise vs Approximate
     final accuracy = await Geolocator.getLocationAccuracy();
 
     if (accuracy == LocationAccuracyStatus.reduced) {
-      // The user chose "Approximate". We halt everything and force them to Settings.
       _showPreciseLocationDialog(
         "Spots relies on your exact location to physically unlock nearby areas. Please open Settings and toggle 'Precise Location' to ON.",
       );
-      return; // ⛔️ HALT: Do not set _hasPermissions to true
+      return;
     }
 
-    // If we made it here, they gave us standard, permanent Precise Location!
     setState(() {
       _hasPermissions = true;
     });
@@ -112,12 +135,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     _startLocationTracking();
   }
 
-  // 🔹 Call this at the very end of your _checkLocationPermissions() method!
   void _startLocationTracking() {
-    // Only update the stream if the user moves at least 3 meters
-    // (Saves massive amounts of battery compared to continuous updates)
     const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.best, // We already forced precise!
+      accuracy: LocationAccuracy.best,
       distanceFilter: 3,
     );
 
@@ -133,13 +153,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         });
   }
 
-  // 🔹 The UX prompt that routes them to the iOS/Android Settings app
   void _showPreciseLocationDialog(String message) {
     if (!mounted) return;
 
     showDialog(
       context: context,
-      barrierDismissible: false, // Force them to interact with the dialog
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(
@@ -156,8 +175,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           ),
           actions: [
             TextButton(
-              onPressed: () =>
-                  Navigator.pop(context), // Let them cancel and stay locked out
+              onPressed: () => Navigator.pop(context),
               child: const Text(
                 "Cancel",
                 style: TextStyle(color: Colors.white54),
@@ -172,7 +190,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               ),
               onPressed: () async {
                 Navigator.pop(context);
-                // 🔹 This magic line opens the OS Settings exactly on your App's page
                 await Geolocator.openAppSettings();
               },
               child: const Text(
@@ -201,65 +218,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
-  // 🔹 The Target Button Action
   void _lockOnUser() {
     setState(() {
       _alignPositionOnUpdate = AlignOnUpdate.always;
     });
-    // Snap the camera back to the user at zoom level 16.0
     _alignPositionStreamController.add(16.0);
   }
-
-  Spot? _selectedSpot;
-  bool _isMoving = false;
-
-  // DUMMY DATA
-  final List<Spot> spots = [
-    Spot(
-      id: '1',
-      ownerId: 'user_123',
-      title: "Secret Garden",
-      description: "A quiet place.",
-      location: const LatLng(32.1782, 34.9076),
-      type: SpotTypes.public,
-      reactionCounts: {SpotReactions.wholesome: 55, SpotReactions.support: 2},
-    ),
-    Spot(
-      id: '2',
-      ownerId: 'user_me',
-      title: "My Hidden Base",
-      description: "Only for me.",
-      location: const LatLng(32.1795, 34.9051),
-      type: SpotTypes.me,
-      reactionCounts: {SpotReactions.meh: 10, SpotReactions.wow: 5},
-    ),
-    Spot(
-      id: '3',
-      ownerId: 'user_456',
-      title: "Skate Park",
-      description: "Concrete ledges.",
-      location: const LatLng(32.1763, 34.9089),
-      type: SpotTypes.private,
-      reactionCounts: {
-        SpotReactions.support: 30,
-        SpotReactions.wholesome: 12,
-        SpotReactions.insightful: 40,
-      },
-    ),
-    Spot(
-      id: '4',
-      ownerId: 'user_4',
-      title: "Far Far Away",
-      description: "km test",
-      location: const LatLng(32.1763, 34.9589),
-      type: SpotTypes.private,
-      reactionCounts: {
-        SpotReactions.support: 30,
-        SpotReactions.wholesome: 12,
-        SpotReactions.insightful: 40,
-      },
-    ),
-  ];
 
   void _onSpotTap(Spot spot) {
     setState(() {
@@ -287,7 +251,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.currentUser;
 
-    // If user is null, show a loading spinner or placeholder
     if (user == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -312,7 +275,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   interactionOptions: const InteractionOptions(
                     flags: InteractiveFlag.all,
                   ),
-                  // 🔹 Break the lock if the user physically drags the map
                   onPositionChanged: (MapPosition position, bool hasGesture) {
                     if (hasGesture &&
                         _alignPositionOnUpdate == AlignOnUpdate.always) {
@@ -333,7 +295,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     ),
                   ),
 
-                  // 🔹 The Magic Location Marker Layer
                   if (_hasPermissions)
                     CurrentLocationLayer(
                       alignPositionStream:
@@ -344,16 +305,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                           color: Colors.blueAccent,
                         ),
                         markerSize: const Size(24, 24),
-                        showHeadingSector:
-                            true, // 🔹 Enables the rotation compass
+                        showHeadingSector: true,
                         headingSectorColor: Colors.blueAccent.withOpacity(0.3),
                         headingSectorRadius: 60,
                       ),
                     ),
 
-                  /// LAYER 1: THE DOTS / PINS
+                  /// LAYER 1: THE DOTS / PINS (Using Live DB Data)
                   MarkerLayer(
-                    markers: spots.map((spot) {
+                    markers: _spots.map((spot) {
                       final isSelected = _selectedSpot?.id == spot.id;
 
                       return Marker(
@@ -361,10 +321,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         height: isSelected ? 60 : 45,
                         point: spot.location,
                         rotate: true,
-                        // alignment: isSelected
-                        //     ? Alignment.center
-                        //     : Alignment.center,
-                        // alignment: Alignment.topCenter,
                         alignment: Alignment.center,
                         key: ValueKey(spot.id),
                         child: GestureDetector(
@@ -417,7 +373,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: 15),
-                    // 🔹 Updated Target Button
                     FloatingActionButton(
                       heroTag: "location",
                       shape: const CircleBorder(),
@@ -456,26 +411,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   // --- WIDGET BUILDERS ---
 
   Widget _buildPopup(Spot spot) {
-    // 1. CALCULATE TOP 3 REACTIONS
-    // Sort the reaction map by count (highest first)
     final sortedEntries = spot.reactionCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    // Take up to 3 of the most popular reactions
     final topReactions = sortedEntries.take(3).map((e) => e.key).toList();
 
-    // Calculate total interactions for the "people count" number
     final totalReactions = spot.reactionCounts.values.fold(
       0,
       (sum, count) => sum + count,
     );
 
-    // 🔹 2. THE LOCAL PROXIMITY MATH
     bool isNear = false;
     double? distanceInMeters;
 
     if (_currentLocation != null) {
-      // The Distance() class uses the Haversine formula to account for the curvature of the Earth
       const Distance distanceCalculator = Distance();
 
       distanceInMeters = distanceCalculator.as(
@@ -484,7 +433,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         spot.location,
       );
 
-      // Unlock threshold: 10 meters
       isNear = distanceInMeters <= 10;
     }
 
@@ -494,9 +442,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         width: 240,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(
-            0xFFF8F7F2,
-          ), // Creamy background matching your image
+          color: const Color(0xFFF8F7F2),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -507,7 +453,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
           ],
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min, // Wraps content tightly
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // --- HEADER: Title & Bookmark ---
@@ -519,24 +465,33 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        spot.title,
+                        // 🔹 Displays the rich address JSON stored in your DB!
+                        spot.popupAddressLine1,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF335C81), // Dark blue text
+                          color: Color(0xFF335C81),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
-                      const Text(
-                        "Created 3 Months Ago",
+                      Text(
+                        spot.popupAddressLine2,
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.blueGrey,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+                      // const Text(
+                      //   "Created 3 Months Ago",
+                      //   style: TextStyle(
+                      //     fontSize: 11,
+                      //     color: Colors.blueGrey,
+                      //     fontWeight: FontWeight.w500,
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),
@@ -553,12 +508,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             // --- MIDDLE: Overlapping Emojis & People Count ---
             Row(
               children: [
-                // Overlapping Emojis Stack
                 if (topReactions.isNotEmpty)
                   OverlappingReactionStack(
                     reactions: topReactions,
                     totalReactions: totalReactions,
-                    outlineColor: Color(0xFFF8F7F2),
+                    outlineColor: const Color(0xFFF8F7F2),
                     counterTextColor: Colors.black87,
                   )
                 else
@@ -569,7 +523,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
                 const Spacer(),
 
-                // People Group Icon & Total
                 const Icon(Icons.group, size: 28, color: Colors.black87),
                 const SizedBox(width: 6),
                 Text(
@@ -577,7 +530,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF335C81), // Dark blue
+                    color: Color(0xFF335C81),
                   ),
                 ),
               ],
@@ -595,7 +548,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     MaterialPageRoute(
                       builder: (_) => SpotDisplayScreen(
                         spotId: spot.id,
-                        spotTitle: spot.title,
+                        // 🔹 Passes the cleaner City/Country combo to the inner screen!
+                        spotTitle: spot.popupAddressLine1,
                       ),
                     ),
                   );
@@ -604,7 +558,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 25),
                   decoration: BoxDecoration(
-                    color: Color.fromARGB(255, 134, 166, 65),
+                    color: const Color.fromARGB(255, 134, 166, 65),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Center(
@@ -627,7 +581,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   const Text(
                     "Go Near spot To View",
                     style: TextStyle(
-                      color: Color(0xFF335C81), // Matched your dark blue header
+                      color: Color(0xFF335C81),
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -664,7 +618,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                             ),
                           ),
                           const Icon(
-                            Icons.directions, // Cool navigation arrow
+                            Icons.directions,
                             color: Colors.white,
                             size: 22,
                           ),
@@ -680,7 +634,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-  // 🔹 Formats distance: meters if under 1km, kilometers if over
   String _formatDistance(double? meters) {
     if (meters == null) return "Locating...";
 
@@ -694,15 +647,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
-  // 🔹 Opens the Navigation Bottom Sheet
   void _openNavigationSheet(Spot spot) async {
     try {
       final availableMaps = await MapLauncher.installedMaps;
 
-      // 🔹 1. Check if the widget is still alive after the async call
       if (!mounted) return;
 
-      // 🔹 2. Handle the edge case where NO maps are installed
       if (availableMaps.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -711,10 +661,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        return; // Halt execution here
+        return;
       }
 
-      // 🔹 3. Show the bottom sheet if maps exist
       showModalBottomSheet(
         context: context,
         backgroundColor: Colors.white,
@@ -739,16 +688,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   for (var map in availableMaps)
                     ListTile(
                       onTap: () {
-                        // 🔹 4. Close the bottom sheet FIRST
                         Navigator.pop(context);
 
-                        // Then launch the external map app
                         map.showMarker(
                           coords: Coords(
                             spot.location.latitude,
                             spot.location.longitude,
                           ),
-                          title: spot.title,
+                          // 🔹 Sends the street address to Google/Apple Maps!
+                          title: spot.fullStreetAddress,
                         );
                       },
                       title: Text(map.mapName),
@@ -769,20 +717,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     }
   }
 
-  // Widget _buildSelectedPin() {
-  //   return const Icon(
-  //     Icons.location_on,
-  //     color: Colors.red,
-  //     size: 55,
-  //     shadows: [
-  //       Shadow(blurRadius: 10, color: Colors.black45, offset: Offset(0, 5)),
-  //     ],
-  //   );
-  // }
   Widget _buildSelectedPin() {
     return Transform.translate(
-      // 🔹 Tweak these X and Y values until the needle is perfectly locked onto the spot!
-      // Negative Y moves it UP. Negative X moves it LEFT.
       offset: const Offset(-11, 7),
       child: SvgPicture.asset(
         'assets/icons/PushPin.svg',
@@ -807,8 +743,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         ],
       ),
       child: Center(
+        // 🔹 This dynamically loads the top reaction based on your models.dart enum!
         child: Image.asset(spot.topReactionAsset, width: 25, height: 25),
-        // child: Text(spot.topEmoji, style: const TextStyle(fontSize: 20)),
       ),
     );
   }
@@ -835,10 +771,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               IconButton(
-                icon: SvgPicture.asset(
-                  'assets/icons/FootPrint.svg',
-                  height: 35,
-                  width: 35,
+                icon: const RotatedBox(
+                  quarterTurns: 3,
+                  child: FaIcon(
+                    FontAwesomeIcons.shoePrints,
+                    size: 30,
+                    color: Colors.white,
+                  ),
                 ),
                 onPressed: _openStepsSheet,
               ),
@@ -909,7 +848,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       clipBehavior: Clip.none,
       builder: (context) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.75, // 0.85
+          initialChildSize: 0.75,
           minChildSize: 0.75,
           maxChildSize: 0.75,
           expand: false,
@@ -920,7 +859,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               contributionsCount: 12365,
               username: "@travel_user",
               scrollController: scrollController,
-              userPhotos: [
+              userPhotos: const [
                 "https://th.bing.com/th/id/OIP.Ufv8ve9S5hVyGsMqbNwqEAHaE8?w=301&h=180&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
                 "https://th.bing.com/th/id/OIP.evi8jxbBP9Xd_hPbwyEoVAHaE8?w=245&h=180&c=7&r=0&o=7&dpr=2&pid=1.7&rm=3",
               ],
@@ -936,8 +875,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   void _openSupabaseTestScreen() {
     Navigator.push(
       context,
-      // 🔹 CHANGE THIS LINE to use the new screen you just created
-      MaterialPageRoute(builder: (context) => EdgeFunctionTestScreen()),
+      MaterialPageRoute(builder: (context) => const EdgeFunctionTestScreen()),
     );
   }
 
@@ -945,7 +883,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     Navigator.push(
       context,
       PageRouteBuilder(
-        opaque: false, // 🔹 THIS IS CRITICAL for the blur effect to work!
+        opaque: false,
         pageBuilder: (context, animation, secondaryAnimation) {
           return const CreateMomentScreen();
         },
@@ -964,7 +902,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         },
         transitionDuration: const Duration(milliseconds: 250),
       ),
-    );
+    ).then((_) {
+      // 🔹 Re-fetch spots when coming back from creating a moment
+      // so the new spot instantly appears on the map!
+      _fetchSpots();
+    });
   }
 
   void _openSaved() {
@@ -975,8 +917,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   /// SMOOTH MOVE ANIMATION
   void _animatedMapMove(LatLng destLocation, double destZoom) {
-    // Create some tweens. These serve to split up the transition from one location to another.
-    // In our case, we want to split the degrees of lat/lng so that we can get a smooth path from A to B.
     final latTween = Tween<double>(
       begin: _mapController.camera.center.latitude,
       end: destLocation.latitude,
@@ -990,21 +930,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       end: destZoom,
     );
 
-    // Create a controller that will play the animation over 500ms
     final controller = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
 
-    // The animation curve (EaseInOut is smooth start/end)
     final Animation<double> animation = CurvedAnimation(
       parent: controller,
       curve: Curves.easeInOutCubic,
     );
 
     controller.addListener(() {
-      // Only move if the controller is still active to prevent
-      // trying to move after a dispose() call
       if (mounted) {
         _mapController.move(
           LatLng(latTween.evaluate(animation), lngTween.evaluate(animation)),
@@ -1016,7 +952,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     animation.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         controller.dispose();
-        // 🔹 CRITICAL: Tell the app the move is done so the popup appears!
         setState(() {
           _isMoving = false;
         });

@@ -4,7 +4,9 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:simple_icons/simple_icons.dart';
+import 'package:video_player/video_player.dart';
+import 'package:text_scroll/text_scroll.dart';
 
 // ============================================================================
 // 🔹 2. THE POLYMORPHIC MEDIA ARCHITECTURE
@@ -20,15 +22,15 @@ abstract class MomentMedia {
 
     if (type == 'text') {
       // 🔹 It now naturally reads the SQL caption directly! No fake JSON needed.
-      return TextMedia(caption);
+      return TextMedia(json?['text']);
     }
-    if (type == 'photo') {
-      return PhotoMedia(json!['url']);
+    if (type == 'image') {
+      return ImageMedia(json!['url']);
     }
     if (type == 'poll') {
       return PollMedia(
-        json!['question'] ?? 'Poll',
-        List<String>.from(json['options'] ?? []),
+        json?['question'] ?? 'Poll',
+        List<String>.from(json?['options'] ?? []),
       );
     }
     if (type == 'audio') {
@@ -36,6 +38,13 @@ abstract class MomentMedia {
         json!['title'] ?? 'Voice Note',
         json['duration'] ?? '0:00',
         json['url'] ?? '',
+      );
+    }
+    if (type == 'video') {
+      return VideoMedia(
+        videoUrl: json!['url'] ?? '',
+        thumbnailUrl:
+            json['thumbnail_url'], // Safely reads the thumbnail if it exists
       );
     }
     if (type == 'music') {
@@ -51,15 +60,19 @@ abstract class MomentMedia {
   }
 }
 
-class PhotoMedia implements MomentMedia {
+class ImageMedia implements MomentMedia {
   final String url;
-  PhotoMedia(this.url);
+  ImageMedia(this.url);
   @override
   Widget buildPreview(BuildContext context) =>
       Image.network(url, fit: BoxFit.cover);
   @override
   Widget buildExpanded(BuildContext context) =>
-      Image.network(url, fit: BoxFit.cover, width: double.infinity);
+      // 🔹 Enforces 3:4 and crops any excess width/height perfectly
+      AspectRatio(
+        aspectRatio: 3 / 4,
+        child: Image.network(url, fit: BoxFit.cover, width: double.infinity),
+      );
 }
 
 class TextMedia implements MomentMedia {
@@ -242,6 +255,34 @@ class MusicMedia implements MomentMedia {
   }
 }
 
+IconData _getPlatformIcon(String platformName) {
+  switch (platformName) {
+    case 'Spotify':
+      return SimpleIcons.spotify;
+    case 'Apple Music':
+      return SimpleIcons.applemusic; // The actual Apple Music logo!
+    case 'YouTube Music':
+      return SimpleIcons.youtubemusic; // Dedicated YT Music logo
+    case 'YouTube':
+      return SimpleIcons.youtube;
+    case 'SoundCloud':
+      return SimpleIcons.soundcloud;
+    case 'Amazon Music':
+      return SimpleIcons.amazonmusic;
+    case 'Pandora':
+      return SimpleIcons.pandora;
+    case 'Audiomack':
+      return SimpleIcons.audiomack;
+    case 'Tidal':
+      return SimpleIcons.tidal;
+    // case 'Deezer':
+    //   return SimpleIcons.graphic_eq_rounded;
+    default:
+      // A safe fallback just in case Odesli ever adds a platform you haven't mapped yet
+      return Icons.music_note_rounded;
+  }
+}
+
 class AudioMedia implements MomentMedia {
   final String title;
   final String duration;
@@ -263,6 +304,153 @@ class AudioMedia implements MomentMedia {
       title: title,
       duration: duration,
       audioUrl: audioUrl,
+    );
+  }
+}
+
+class VideoMedia implements MomentMedia {
+  final String videoUrl;
+  final String? thumbnailUrl;
+
+  VideoMedia({required this.videoUrl, this.thumbnailUrl});
+
+  @override
+  Widget buildPreview(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // 1. Show the thumbnail if we have it, otherwise a black box
+        if (thumbnailUrl != null && thumbnailUrl!.isNotEmpty)
+          Image.network(thumbnailUrl!, fit: BoxFit.cover)
+        else
+          Container(color: const Color(0xFF141418)),
+
+        // 2. Overlay a play button to indicate it's a video
+        Container(
+          color: Colors.black.withOpacity(0.2),
+          child: const Center(
+            child: Icon(Icons.play_circle_fill, color: Colors.white, size: 48),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget buildExpanded(BuildContext context) {
+    return VideoPlayerWidget(videoUrl: videoUrl);
+  }
+}
+
+class VideoPlayerWidget extends StatefulWidget {
+  final String videoUrl;
+  const VideoPlayerWidget({super.key, required this.videoUrl});
+
+  @override
+  State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
+}
+
+class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
+  late VideoPlayerController _controller;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => _isInitialized = true);
+          _controller.setLooping(true);
+          // Waiting for the user's tap to play!
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _togglePlay() {
+    setState(() {
+      _controller.value.isPlaying ? _controller.pause() : _controller.play();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_isInitialized) {
+      return const AspectRatio(
+        aspectRatio: 3 / 4,
+        child: Center(child: CircularProgressIndicator(color: Colors.white54)),
+      );
+    }
+
+    // 🔹 1. Define your strict window
+    const double targetRatio = 3 / 4;
+
+    // 🔹 2. Get the true, rotated aspect ratio of the video
+    final double videoRatio = _controller.value.aspectRatio;
+
+    // 🔹 3. Mathematically calculate the exact zoom needed to push black bars off the screen
+    final double scale = videoRatio < targetRatio
+        ? targetRatio / videoRatio
+        : videoRatio / targetRatio;
+
+    return GestureDetector(
+      onTap: _togglePlay,
+      child: Container(
+        color: Colors.black, // Cinematic backdrop
+        width: double.infinity,
+        child: AspectRatio(
+          aspectRatio: targetRatio, // Locks the outer box to 3:4
+          child: ClipRect(
+            // Slices off whatever spills out!
+            child: Stack(
+              alignment: Alignment.center,
+              fit: StackFit.expand,
+              children: [
+                // ==========================================
+                // 🔹 THE MATHEMATICAL CROP
+                // ==========================================
+                Center(
+                  child: Transform.scale(
+                    scale: scale,
+                    child: AspectRatio(
+                      aspectRatio: videoRatio,
+                      child: VideoPlayer(_controller),
+                    ),
+                  ),
+                ),
+
+                // ==========================================
+                // 🔹 PLAY BUTTON OVERLAY
+                // ==========================================
+                if (!_controller.value.isPlaying)
+                  Container(
+                    color: Colors.black.withOpacity(0.15),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.5),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 64,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -318,14 +506,18 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
       await _audioPlayer.setUrl(widget.previewUrl);
       _audioPlayer.playerStateStream.listen((state) {
         if (state.processingState == ProcessingState.completed && mounted) {
+          _audioPlayer.pause();
+          _audioPlayer.seek(Duration.zero);
+
           setState(() {
             _isPlaying = false;
             _controller.stop();
-            _audioPlayer.seek(Duration.zero);
           });
         }
       });
-    } catch (e) {}
+    } catch (e) {
+      debugPrint("Audio init error: $e");
+    }
   }
 
   @override
@@ -556,13 +748,41 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
               ],
             ),
             const SizedBox(height: 22),
-            Text(
-              widget.songTitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            // Text(
+            //   widget.songTitle,
+            //   textAlign: TextAlign.center,
+            //   style: const TextStyle(
+            //     fontSize: 24,
+            //     fontWeight: FontWeight.bold,
+            //     color: Colors.white,
+            //   ),
+            // ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: TextScroll(
+                widget.songTitle,
+                mode: TextScrollMode.endless, // Infinite car radio loop
+                velocity: const Velocity(pixelsPerSecond: Offset(40, 0)),
+                delayBefore: const Duration(seconds: 2),
+                pauseBetween: const Duration(seconds: 2),
+
+                intervalSpaces: 10,
+
+                // ==========================================
+                // 🔹 THE PREMIUM TOUCH: EDGE FADES
+                // ==========================================
+                fadedBorder: true,
+                // Creates a smooth gradient fade on the outer 8% of the container
+                // so the text gracefully disappears instead of harshly clipping!
+                fadedBorderWidth: 0.08,
+
+                textAlign:
+                    TextAlign.center, // Keeps short titles perfectly centered
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
             const SizedBox(height: 5),
@@ -573,53 +793,88 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
 
             const Divider(indent: 25, endIndent: 25),
             //const SizedBox(height: 25),
-            if (widget.platformLinks.isNotEmpty) ...[
-              // const Text(
-              //   "Listen to full song on:",
-              //   style: TextStyle(
-              //     color: Color(0xFFF2F2F2),
-              //     fontSize: 12,
-              //     fontWeight: FontWeight.bold,
-              //   ),
-              // ),
-              const SizedBox(height: 8),
-              Builder(
-                builder: (context) {
-                  // 1. Generate the buttons and strip out the nulls
-                  final validButtons = widget.platformLinks.entries
-                      .map(
-                        (entry) => _buildPlatformButton(entry.key, entry.value),
-                      )
-                      .whereType<
-                        Widget
-                      >() // 🔹 Drops all the nulls from the list!
-                      .toList();
+            Builder(
+              builder: (context) {
+                // 1. Clone the map so we can safely edit it
+                Map<String, dynamic> cleanedLinks = Map.from(
+                  widget.platformLinks,
+                );
 
-                  // 2. If no valid streaming services exist, show the fallback
-                  if (validButtons.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text(
-                        "No streaming service found",
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 14,
-                          fontStyle: FontStyle.italic,
-                        ),
+                // 2. 🔹 THE REDUNDANCY FILTER
+                // If YT Music exists, scrub standard YouTube from the list
+                if (cleanedLinks.containsKey('YouTube Music') &&
+                    cleanedLinks.containsKey('YouTube')) {
+                  cleanedLinks.remove('YouTube');
+                }
+
+                // 3. 🔹 THE SORTING ALGORITHM
+                // This mathematically forces the "Big 3" to the front of the line
+                final desiredOrder = [
+                  'Spotify',
+                  'Apple Music',
+                  'YouTube Music',
+                  'YouTube',
+                  'SoundCloud',
+                  'Amazon Music',
+                  'Pandora',
+                  'Audiomack',
+                  'Tidal',
+                  'Deezer',
+                ];
+
+                final sortedKeys = cleanedLinks.keys.toList()
+                  ..sort((a, b) {
+                    int indexA = desiredOrder.indexOf(a);
+                    int indexB = desiredOrder.indexOf(b);
+                    if (indexA == -1) indexA = 999; // Unknowns go to the back
+                    if (indexB == -1) indexB = 999;
+                    return indexA.compareTo(indexB);
+                  });
+
+                // 4. Generate the widgets using our sorted list
+                final validButtons = sortedKeys
+                    .map((key) => _buildPlatformButton(key, cleanedLinks[key]))
+                    .whereType<Widget>()
+                    .toList();
+
+                if (validButtons.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      "No streaming service found",
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
                       ),
-                    );
-                  }
-
-                  // 3. Otherwise, render the wrap!
-                  return Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: validButtons,
+                    ),
                   );
-                },
-              ),
-            ],
+                }
+
+                // 5. 🔹 THE HORIZONTAL SCROLL
+                return Center(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    // If there are 2 items, Row centers them. If there are 6, it scrolls!
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: validButtons
+                          .map(
+                            (btn) => Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8.0,
+                              ),
+                              child: btn,
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -627,54 +882,32 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
   }
 
   Widget? _buildPlatformButton(String platformName, String url) {
-    String svgPath;
-    switch (platformName.toLowerCase()) {
-      case 'spotify':
-        svgPath = 'assets/icons/spotify-icon.svg';
-        break;
-      case 'apple music':
-      case 'apple':
-        svgPath = 'assets/icons/apple-music-icon.svg';
-        break;
-      case 'youtube':
-        svgPath = 'assets/icons/youtube-music-icon.svg';
-        break;
-      default:
-        return null;
-    }
-
     return GestureDetector(
       onTap: () => _launchStreamingApp(url),
-      // 🔹 1. SizedBox guarantees every item takes up the exact same horizontal space in the Wrap
       child: SizedBox(
-        width: 60,
+        width: 64, // Slightly widened to fit long names
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            // 🔹 2. The Squircle wrapping ONLY the icon
             Container(
               width: 50,
               height: 50,
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(
-                  16,
-                ), // Gives it the rounded square look
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white.withOpacity(0.15)),
               ),
               child: Center(
-                child: SvgPicture.asset(
-                  svgPath,
-                  width:
-                      26, // Scaled slightly to fit the new 56x56 box perfectly
-                  height: 26,
+                // 🔹 Feeds the name into your new Simple Icons helper!
+                child: Icon(
+                  _getPlatformIcon(platformName),
+                  color: Colors.white,
+                  size: 26,
                 ),
               ),
             ),
-
-            const SizedBox(height: 8), // Gap between the icon box and the text
-            // 🔹 3. The Text sitting underneath
+            const SizedBox(height: 8),
             Text(
               platformName.toUpperCase().replaceAll(' ', '\n'),
               textAlign: TextAlign.center,
@@ -683,7 +916,7 @@ class _SpinningVinylPlayerState extends State<SpinningVinylPlayer>
               style: const TextStyle(
                 color: Colors.white70,
                 fontWeight: FontWeight.bold,
-                fontSize: 10,
+                fontSize: 9, // Dropped to 9 to fit "YOUTUBE MUSIC" nicely
                 height: 1.1,
                 letterSpacing: 0.5,
               ),
@@ -757,14 +990,18 @@ class _CassetteTapePlayerState extends State<CassetteTapePlayer>
       await _audioPlayer.setUrl(widget.audioUrl);
       _audioPlayer.playerStateStream.listen((state) {
         if (state.processingState == ProcessingState.completed && mounted) {
+          _audioPlayer.pause();
+          _audioPlayer.seek(Duration.zero);
+
           setState(() {
             _isPlaying = false;
             _controller.stop();
-            _audioPlayer.seek(Duration.zero);
           });
         }
       });
-    } catch (e) {}
+    } catch (e) {
+      debugPrint("Audio init error: $e");
+    }
   }
 
   @override

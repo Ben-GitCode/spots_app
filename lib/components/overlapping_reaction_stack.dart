@@ -138,7 +138,7 @@ import 'package:spots_app/utils/models.dart';
 // }
 
 class OverlappingReactionStack extends StatelessWidget {
-  final List<SpotReactions> reactions;
+  final List<Reactions> reactions;
   final int? totalReactions;
   final double scale;
   final Color outlineColor;

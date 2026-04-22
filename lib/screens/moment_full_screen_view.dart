@@ -21,11 +21,11 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
   // 🔹 The Centralized Data Updater
   // This safely handles swapping, adding, and removing reactions
   void _handleReactionSelect(
-    SpotReactions tappedReaction,
+    Reactions tappedReaction,
     VoidCallback? updateListSheet,
   ) {
     setState(() {
-      SpotReactions? oldReaction = widget.moment.userReaction;
+      Reactions? oldReaction = widget.moment.userReaction;
 
       if (oldReaction == tappedReaction) {
         // SCENARIO 1: Tapping the already selected reaction (Remove it)
@@ -301,19 +301,13 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 // 🔹 Passing the Enums directly
-                _buildAnimatedEmojiBtn(SpotReactions.funny, updateListSheet),
-                _buildAnimatedEmojiBtn(SpotReactions.wow, updateListSheet),
-                _buildAnimatedEmojiBtn(
-                  SpotReactions.wholesome,
-                  updateListSheet,
-                ),
-                _buildAnimatedEmojiBtn(
-                  SpotReactions.insightful,
-                  updateListSheet,
-                ),
-                _buildAnimatedEmojiBtn(SpotReactions.sad, updateListSheet),
-                _buildAnimatedEmojiBtn(SpotReactions.meh, updateListSheet),
-                _buildAnimatedEmojiBtn(SpotReactions.support, updateListSheet),
+                _buildAnimatedEmojiBtn(Reactions.funny, updateListSheet),
+                _buildAnimatedEmojiBtn(Reactions.wow, updateListSheet),
+                _buildAnimatedEmojiBtn(Reactions.wholesome, updateListSheet),
+                _buildAnimatedEmojiBtn(Reactions.insightful, updateListSheet),
+                _buildAnimatedEmojiBtn(Reactions.sad, updateListSheet),
+                _buildAnimatedEmojiBtn(Reactions.meh, updateListSheet),
+                _buildAnimatedEmojiBtn(Reactions.support, updateListSheet),
               ],
             ),
           ),
@@ -323,7 +317,7 @@ class _MomentFullScreenViewState extends State<MomentFullScreenView> {
   }
 
   Widget _buildAnimatedEmojiBtn(
-    SpotReactions reaction,
+    Reactions reaction,
     VoidCallback? updateListSheet,
   ) {
     bool isSelected = widget.moment.userReaction == reaction;

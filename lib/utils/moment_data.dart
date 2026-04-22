@@ -12,11 +12,11 @@ class Moment {
   final DateTime timestamp;
   final MomentMedia media;
   final String caption;
-  final Map<SpotReactions, int> reactionCounts;
+  final Map<Reactions, int> reactionCounts;
   final int commentCount;
   final LatLng location;
 
-  SpotReactions? userReaction;
+  Reactions? userReaction;
 
   Moment({
     required this.id,
@@ -37,7 +37,7 @@ class Moment {
   int get totalReactions =>
       reactionCounts.values.fold(0, (sum, val) => sum + val);
 
-  List<SpotReactions> get top3Reactions {
+  List<Reactions> get top3Reactions {
     var sortedEntries = reactionCounts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
     return sortedEntries.take(3).map((e) => e.key).toList();
@@ -61,7 +61,7 @@ class Moment {
 
     // 3. Extract joined profile data
     final profile = map['users'] ?? {};
-    Map<SpotReactions, int> parsedReactions = {};
+    Map<Reactions, int> parsedReactions = {};
 
     return Moment(
       id: map['id'].toString(),

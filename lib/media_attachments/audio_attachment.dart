@@ -108,7 +108,7 @@ class AudioAttachment extends MediaAttachment {
   bool get isTopLayout => false;
 
   @override
-  bool get isValid => audioPath != null;
+  bool get isValid => audioPath != null && !isRecording;
 
   @override
   Map<String, dynamic> toJson() {
